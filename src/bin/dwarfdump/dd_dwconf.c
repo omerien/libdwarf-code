@@ -29,7 +29,7 @@ Portions Copyright 2012 SN Systems Ltd. All rights reserved.
 
 #include <config.h>
 
-#include <ctype.h>  /* isspace() */
+#include <ctype.h>  /* isspace() */ /* If you get error with it on Mac, try reinstalling it into /usr/local/include */
 #include <stdlib.h> /* exit() free() getenv() realloc() strtoul() */
 #include <string.h> /* memset() strcmp() strlen()
     strncmp() strrchr()*/
