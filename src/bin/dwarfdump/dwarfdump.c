@@ -42,6 +42,10 @@ Portions Copyright 2012 SN Systems Ltd. All rights reserved.
 #include <string.h> /* memset() strcmp() stricmp()
     strlen() strrchr() strstr() */
 
+#ifdef __APPLE__
+#include <fcntl.h> /* if it causes problems on Mac, try to install it manually in /usr/local/include with bits/fctnl.h */
+#endif
+
 /* Windows specific header files */
 #ifdef _WIN32
 #ifdef HAVE_STDAFX_H
@@ -136,7 +140,11 @@ open_a_file(const char * name)
 {
     /* Set to a file number that cannot be legal. */
     int fd = -1;
+    #ifdef __APPLE__
+    fd = (name, O_RDONLY | O_BINARY);
+    #else
     fd = open(name, O_RDONLY | O_BINARY);
+    #endif
     return fd;
 }
 
