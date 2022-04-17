@@ -554,7 +554,11 @@ dwarf_object_detector_path_dSYM(
             *errcode =  DW_DLE_PATH_SIZE_TOO_SMALL;
             return DW_DLV_ERROR;
         }
-        fd = open(outpath,O_RDONLY|O_BINARY);
+        #ifdef __APPLE__
+        fd = (outpath, O_RDONLY | O_BINARY);
+        #else
+        fd = open(outpath, O_RDONLY | O_BINARY);
+        #endif
         if (fd < 0) {
             outpath[0] = 0;
             return DW_DLV_NO_ENTRY;
@@ -804,8 +808,11 @@ _dwarf_debuglink_finder_internal(
 
         /*  First, open the file to determine if it exists.
             If not, loop again */
-
-        pfd = open(pa,O_RDONLY|O_BINARY);
+        #ifdef __APPLE__
+        pfd = (pa, O_RDONLY | O_BINARY);
+        #else
+        pfd = open(pa, O_RDONLY | O_BINARY);
+        #endif
         if (pfd  < 0) {
             /*  This is the usual path. */
             continue;
@@ -900,11 +907,19 @@ dwarf_object_detector_path_b(
             lpathsource = DW_PATHSOURCE_debuglink;
         }
         dwarfstring_destructor(&m);
-        fd = open(outpath,O_RDONLY|O_BINARY);
+        #ifdef __APPLE__
+        fd = (outpath, O_RDONLY | O_BINARY);
+        #else
+        fd = open(outpath, O_RDONLY | O_BINARY);
+        #endif
         /* fall through to get fsize etc */
     } else {
         lpathsource = DW_PATHSOURCE_basic;
-        fd = open(path,O_RDONLY|O_BINARY);
+        #ifdef __APPLE__
+        fd = (path, O_RDONLY | O_BINARY);
+        #else
+        fd = open(path, O_RDONLY | O_BINARY);
+        #endif
     }
     if (fd < 0) {
         if (pathsource) {
