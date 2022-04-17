@@ -36,7 +36,7 @@ Portions Copyright (C) 2011-2019 David Anderson. All Rights Reserved.
 
 #include <stdio.h>  /* printf() */
 #include <stdlib.h> /* calloc() free() */
-#include <assert.h> /* assert() */
+#include <assert.h> /* assert() */ /* If you get error with it on Mac, try reinstalling it in /usr/local/include */
 #include <string.h> /* strcmp() */
 
 /* Windows specific header files */
