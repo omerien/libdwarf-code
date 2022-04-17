@@ -66,6 +66,9 @@ dwarf_init_path_dl(path true_path and globals, dbg1
 #include <stddef.h> /* size_t */
 #include <stdlib.h> /* free() */
 #include <string.h> /* strdup() */
+#ifdef __APPLE__
+#include <fcntl.h> /* if it causes problems on Mac, try to install it manually in /usr/local/include with bits/fctnl.h */
+#endif
 
 #ifdef _WIN32
 #ifdef HAVE_STDAFX_H
@@ -104,8 +107,11 @@ open_a_file(const char * name)
 {
     /* Set to a file number that cannot be legal. */
     int fd = -1;
-
+    #ifdef __APPLE__
+    fd = (name, O_RDONLY | O_BINARY);
+    #else
     fd = open(name, O_RDONLY | O_BINARY);
+    #endif
     return fd;
 }
 
