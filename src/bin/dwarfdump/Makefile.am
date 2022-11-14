@@ -2,6 +2,7 @@
 ###This code is public domain and can be freely used or copied.
 MAINTAINERCLEANFILES = Makefile.in
 
+AUTOMAKE_OPTIONS=subdir-objects
 bin_PROGRAMS = dwarfdump
 
 dwarfdump_SOURCES = \
@@ -20,6 +21,7 @@ dd_common.h \
 dd_compiler_info.c \
 dd_compiler_info.h \
 dd_defined_types.h \
+dd_minimal.h \
 dd_regex.c \
 dd_regex.h \
 dd_safe_strcpy.h \
@@ -57,6 +59,7 @@ print_abbrevs.c \
 print_aranges.c \
 print_debugfission.c \
 print_die.c \
+print_debug_addr.c \
 print_debug_gnu.c \
 print_debug_gnu.h \
 print_debug_names.c \

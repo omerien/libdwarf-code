@@ -7,6 +7,7 @@ libdwarf_src = [
   'dwarf_arange.c',
   'dwarf_crc.c',
   'dwarf_crc32.c',
+  'dwarf_debugaddr.c',
   'dwarf_debuglink.c',
   'dwarf_die_deliv.c',
   'dwarf_debugnames.c',
@@ -62,15 +63,20 @@ libdwarf_src = [
 ]
 
 zlib_deps = dependency('zlib', method: 'pkg-config', required: false)
+zstd_deps = dependency('zstd', method: 'pkg-config', required: false)
 
 if zlib_deps.found() == true
   config_h.set10('HAVE_ZLIB', true)
   config_h.set10('HAVE_ZLIB_H', true)
 endif
+if zstd_deps.found() == true
+  config_h.set11('HAVE_ZSTD', true)
+  config_h.set11('HAVE_ZSTD_H', true)
+endif
 
-libdwarf_lib = library('libdwarf', libdwarf_src,
+libdwarf_lib = library('dwarf', libdwarf_src,
   c_args : [ dev_cflags, libdwarf_args, '-DLIBDWARF_BUILD' ],
-  dependencies : zlib_deps,
+  dependencies : [ zlib_deps, zstd_deps ],
   gnu_symbol_visibility: 'hidden',
   include_directories : config_dir,
   install : true,
@@ -81,7 +87,7 @@ libdwarf_lib = library('libdwarf', libdwarf_src,
 libdwarf = declare_dependency(
   include_directories : [ include_directories('.')],
   link_with : libdwarf_lib,
-  dependencies : zlib_deps
+  dependencies : [zlib_deps, zstd_deps]
 )
 
 install_headers(libdwarf_header_src,

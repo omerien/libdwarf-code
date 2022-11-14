@@ -24,10 +24,11 @@
   Boston MA 02110-1301, USA.
 
 */
-#include "config.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include "dwarf.h"
+#include <config.h>
+
+#include <stdio.h>  /* printf() */
+#include <stdlib.h> /* exit() */
+
 #include "libdwarf.h"
 #include "dd_globals.h"
 /*  section_bitmaps.h and .c actually involved  bits,
@@ -36,7 +37,7 @@
     See reloc_map and section_map in command_options.c */
 #include "dd_section_bitmaps.h"
 
-int main(int argc, char *argv[])
+int main(void)
 {
     unsigned i = 1;
 
@@ -46,7 +47,7 @@ int main(int argc, char *argv[])
         printf("FAIL map_sections.c sections array wrong size "
             "%u vs %u\n",
             arraycount,DW_HDR_ARRAY_SIZE);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     for ( ; i < DW_HDR_ARRAY_SIZE; ++i) {
 
@@ -58,17 +59,14 @@ int main(int argc, char *argv[])
                 mp->name?mp->name:"<no name",
                 mp->value,
                 i);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         if (!mp->name) {
             printf("FAIL map_sections.c at entry %u"
                 " we have no name!\n",i);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
     printf("PASS section maps\n");
     return 0;
-
-    (void)argc;
-    (void)argv;
 }

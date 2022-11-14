@@ -29,6 +29,16 @@
 #define  UNUSEDARG
 #endif
 
+#ifdef _MSC_VER /* Macro to select VS compiler */
+#include <windows.h>
+typedef SSIZE_T ssize_t;
+#ifdef _WIN64
+typedef long long off_t;
+#else
+typedef long off_t;
+#endif
+#endif /* _MSC_VER */
+
 #ifndef TRUE
 #define TRUE 1
 #endif /* TRUE */
@@ -104,5 +114,6 @@
                 sizeof(dest) - (length));                         \
         }                                                         \
     } while (0)
-#endif
+#endif /* LITTLE ENDIAN */
+
 #endif /* LIBDWARF_PRIVATE_H */

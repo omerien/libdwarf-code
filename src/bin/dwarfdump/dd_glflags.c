@@ -38,6 +38,8 @@ Copyright (C) 2017-2020 David Anderson. All Rights Reserved.
 #include "dd_globals.h"
 #include "dd_esb.h"                /* For flexible string buffer. */
 #include "dd_dwconf.h"
+#include "dd_checkutil.h"
+#include "dd_glflags.h"
 #include "dd_safe_strcpy.h"
 
 #ifdef TRIVIAL_NAMING  /* for make rebuild */
@@ -86,6 +88,7 @@ init_global_flags(void)
     glflags.gf_frame_flag = FALSE;      /* .debug_frame section. */
     glflags.gf_eh_frame_flag = FALSE;   /* GNU .eh_frame section. */
     glflags.gf_pubnames_flag = FALSE;
+    glflags.gf_debug_addr_flag = FALSE;
 
     /* DWARF2,3,4. Old macro section*/
     glflags.gf_macinfo_flag = FALSE;
@@ -102,6 +105,7 @@ init_global_flags(void)
     glflags.gf_static_var_flag = FALSE;
     glflags.gf_types_flag = FALSE;
     glflags.gf_weakname_flag = FALSE;
+    glflags.gf_show_args_flag = FALSE;
 
     /* Control printing of Elf header. */
     glflags.gf_header_flag = FALSE;

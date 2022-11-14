@@ -9,6 +9,7 @@ set_source_group(SOURCES "Source Files" dd_addrmap.c
     dd_attr_form.c
     dd_canonical_append.c
     print_debugfission.c print_die.c 
+    print_debug_addr.c
     print_debug_gnu.c
     print_debug_names.c  print_debug_sup.c
     print_frames.c  print_gdbindex.c
@@ -32,6 +33,7 @@ set_source_group(SOURCES "Source Files" dd_addrmap.c
 set_source_group(HEADERS "Header Files" 
   dd_addrmap.h dd_attr_form.h dd_checkutil.h dd_common.h dd_regex.h
   dd_safe_strcpy.h dd_dwconf.h
+  dd_minimal.h
   dd_command_options.h dd_compiler_info.h
   dd_opscounttab.h 
   print_debug_gnu.h
@@ -61,7 +63,7 @@ target_compile_definitions(dwarfdump PRIVATE
     "CONFPREFIX=${CMAKE_INSTALL_PREFIX}/lib")
 target_compile_options(dwarfdump PRIVATE ${DW_FWALL})
 
-target_link_libraries(dwarfdump PRIVATE ${dwarf-target} ${DW_FZLIB}) 
+target_link_libraries(dwarfdump PRIVATE ${dwarf-target} ${DW_FZLIB} ${DW_FZSTD} ) 
 
 if(${CMAKE_SIZEOF_VOID_P} EQUAL 8)
 	set(SUFFIX 64)

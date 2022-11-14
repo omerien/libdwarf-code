@@ -1,6 +1,7 @@
 ###Copyright (C) 2018 Vincent Torri <vincent dot torri at gmail dot com
 ###This code is public domain and can be freely used or copied.
 
+AUTOMAKE_OPTIONS=subdir-objects
 MAINTAINERCLEANFILES = Makefile.in
 
 ### libdwarf
@@ -18,6 +19,8 @@ dwarf_arange.h \
 dwarf_base_types.h \
 dwarf_crc.c \
 dwarf_crc32.c \
+dwarf_debugaddr.c \
+dwarf_debugaddr.h \
 dwarf_debuglink.c \
 dwarf_debuglink.h \
 dwarf_die_deliv.c \
@@ -117,9 +120,9 @@ libdwarf_private.h
 
 libdwarf_la_CPPFLAGS = -DLIBDWARF_BUILD
 
-libdwarf_la_CFLAGS = @ZLIB_CFLAGS@ $(DWARF_CFLAGS_WARN)
+libdwarf_la_CFLAGS = @ZLIB_CFLAGS@ @ZSTD_CFLAGS@ $(DWARF_CFLAGS_WARN)
 
-libdwarf_la_LIBADD = @DWARF_LIBS@ @ZLIB_LIBS@
+libdwarf_la_LIBADD = @DWARF_LIBS@ @ZLIB_LIBS@ @ZSTD_LIBS@
 
 libdwarf_la_LDFLAGS = -fPIC -no-undefined -version-info @version_info@ @release_info@
 

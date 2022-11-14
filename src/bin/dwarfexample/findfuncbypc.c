@@ -102,13 +102,15 @@ printusage(void)
     printf("Usage example: "
         "./findfuncbypc --pc=0x10000 ./findfuncbypc\n");
     printf(" options list:\n");
+    printf(" --help or -h prints this usage message and stops.\n");
     printf(" --pc=(hex or decimal pc address)\n");
     printf(" --printdetails  \n");
     printf("   prints some details of the discovery process\n");
     printf(" --allinstances\n");
     printf("   reports but does does not stop processing\n");
     printf("   on finding pc address\n");
-    printf(" --help or -h prints this usage message an stops.\n");
+    printf(" The argument following valid -- arguments must\n");
+    printf("   be a valid object file path\n");
 }
 
 static void target_data_destructor( struct target_data_s *td);
@@ -155,7 +157,7 @@ main(int argc, char **argv)
 
     real_path[0] = 0;
     memset(&target_data,0, sizeof(target_data));
-    for (i = 1; i < (argc-1) ; ++i) {
+    for (i = 1; i < argc ; ++i) {
         if (startswithextractnum(argv[i],"--pc=",
             &target_pc)) {
             /* done */
@@ -171,15 +173,16 @@ main(int argc, char **argv)
             printusage();
             exit(0);
         } else {
-            printf("Unknown argument \"%s\", give up \n",argv[i]);
-            exit(1);
+            /*  Assume next arg is a pathname.*/
+            break;
         }
     }
-    if (i >= (argc-1)) {
+    if (i > (argc-1)) {
         printusage();
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     filepath = argv[i];
+    /*  Ignoring any later arguments on the command line */
     res = dwarf_init_path(filepath,
         real_path,
         PATH_LEN,
@@ -190,11 +193,12 @@ main(int argc, char **argv)
             filepath,
             dwarf_errno(error),
             dwarf_errmsg(error));
-        exit(1);
+        dwarf_dealloc_error(dbg,error);
+        exit(EXIT_FAILURE);
     }
     if (res == DW_DLV_NO_ENTRY) {
         printf("Giving up, file %s not found\n",filepath);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     res = look_for_our_target(dbg,&target_data,&error);
     target_data_destructor(&target_data);
@@ -585,7 +589,7 @@ look_for_our_target(Dwarf_Debug dbg,
             char *em = dwarf_errmsg(*errp);
             printf("Error in dwarf_next_cu_header: %s\n",em);
             target_data_destructor(td);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         if (res == DW_DLV_NO_ENTRY) {
             /* Done. */
@@ -601,13 +605,13 @@ look_for_our_target(Dwarf_Debug dbg,
             char *em = dwarf_errmsg(*errp);
             printf("Error in dwarf_siblingof_b on CU die: %s\n",em);
             target_data_destructor(td);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         if (res == DW_DLV_NO_ENTRY) {
             /* Impossible case. */
             printf("no entry! in dwarf_siblingof on CU die \n");
             target_data_destructor(td);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         td->td_cu_die = cu_die;
@@ -626,7 +630,7 @@ look_for_our_target(Dwarf_Debug dbg,
             char *em = dwarf_errmsg(*errp);
             printf("Impossible return code in reading DIEs: %s\n",em);
             target_data_destructor(td);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         else if (res == NOT_THIS_CU) {
             /* This is normal. Keep looking */
@@ -635,7 +639,7 @@ look_for_our_target(Dwarf_Debug dbg,
             char *em = dwarf_errmsg(*errp);
             printf("Error in reading DIEs: %s\n",em);
             target_data_destructor(td);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         else if (res == DW_DLV_NO_ENTRY) {
             /* This is odd. Assume normal. */
@@ -664,7 +668,7 @@ get_die_and_siblings(Dwarf_Debug dbg, Dwarf_Die in_die,
     res = examine_die_data(dbg,is_info,in_die,in_level,td,errp);
     if (res == DW_DLV_ERROR) {
         printf("Error in die access , level %d \n",in_level);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if (res == DW_DLV_NO_ENTRY) {
         return res;
@@ -687,7 +691,7 @@ get_die_and_siblings(Dwarf_Debug dbg, Dwarf_Die in_die,
         res = dwarf_child(cur_die,&child,errp);
         if (res == DW_DLV_ERROR) {
             printf("Error in dwarf_child , level %d \n",in_level);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         if (res == DW_DLV_OK) {
             int res2 = 0;
@@ -725,7 +729,7 @@ get_die_and_siblings(Dwarf_Debug dbg, Dwarf_Die in_die,
             char *em = dwarf_errmsg(*errp);
             printf("Error in dwarf_siblingof_b , level %d :%s \n",
                 in_level,em);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         if (res == DW_DLV_NO_ENTRY) {
             /* Done at this level. */
@@ -895,7 +899,7 @@ check_subprog_ranges_for_match(Dwarf_Debug dbg,
         default:
             printf("Impossible debug_ranges content!"
                 " enum val %d \n",(int)cur->dwr_type);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
     dwarf_dealloc_ranges(dbg,ranges,ranges_count);
@@ -1197,7 +1201,7 @@ check_comp_dir(Dwarf_Debug dbg,Dwarf_Die die,
                 td->td_cu_highpc = highpcr;
                 td->td_cu_haslowhighpc = TRUE;
                 done = TRUE;
-                res = IN_THIS_CU;
+                finalres = IN_THIS_CU;
                 break;
             case DW_RANGES_ADDRESS_SELECTION:
                 baseaddr = cur->dwr_addr2;
@@ -1207,7 +1211,7 @@ check_comp_dir(Dwarf_Debug dbg,Dwarf_Die die,
             default:
                 printf("Impossible debug_ranges content!"
                     " enum val %d \n",(int)cur->dwr_type);
-                exit(1);
+                exit(EXIT_FAILURE);
             }
         }
         dwarf_dealloc_ranges(dbg,ranges,ranges_count);
@@ -1229,7 +1233,7 @@ examine_die_data(Dwarf_Debug dbg,
     res = dwarf_tag(die,&tag,errp);
     if (res != DW_DLV_OK) {
         printf("Error in dwarf_tag , level %d \n",level);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if ( tag == DW_TAG_subprogram ||
         tag == DW_TAG_inlined_subroutine) {

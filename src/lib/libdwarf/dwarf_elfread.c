@@ -264,6 +264,8 @@ find_section_to_relocate(Dwarf_Debug dbg,Dwarf_Half section_index,
     MATCH_REL_SEC(section_index,dbg->de_debug_macinfo,relocatablesec);
     MATCH_REL_SEC(section_index,dbg->de_debug_pubnames,
         relocatablesec);
+    MATCH_REL_SEC(section_index,dbg->de_debug_names,
+        relocatablesec);
     MATCH_REL_SEC(section_index,dbg->de_debug_ranges,relocatablesec);
     MATCH_REL_SEC(section_index,dbg->de_debug_frame,
         relocatablesec);
@@ -346,8 +348,11 @@ update_entry(Dwarf_Debug dbg,
         reloc_size = 4;
     } else if (_dwarf_is_64bit_abs_reloc(type, machine)) {
         reloc_size = 8;
-    } else if (machine == EM_X86_64 && type == R_X86_64_NONE) {
-        /*  There is nothing to do. */
+    } else if (!type) {
+        /*  There is nothing to do. , this is the case such as
+            R_AARCH64_NONE and R_X86_64_NONE and the other machine
+            cases have it too. Most object files do not have
+            any relocation records of type R_<machine>_NONE.  */
         return DW_DLV_OK;
     } else {
         *error = DW_DLE_RELOC_SECTION_RELOC_TARGET_SIZE_UNKNOWN;

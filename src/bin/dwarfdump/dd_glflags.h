@@ -136,6 +136,7 @@ struct glflags_s {
     Dwarf_Bool gf_macinfo_flag; /* DWARF2,3,4. Old macro section*/
     Dwarf_Bool gf_macro_flag; /* DWARF5 */
     Dwarf_Bool gf_pubnames_flag;
+    Dwarf_Bool gf_debug_addr_flag;
     Dwarf_Bool gf_ranges_flag; /* .debug_ranges section. */
     Dwarf_Bool gf_reloc_flag;  /* Elf relocations, not DWARF. */
     Dwarf_Bool gf_static_func_flag;/* SGI only */
@@ -263,6 +264,7 @@ struct glflags_s {
 
     char **  gf_global_debuglink_paths;
     unsigned gf_global_debuglink_count;
+    Dwarf_Bool gf_show_args_flag;
 
     /*  Base address has a special meaning in DWARF4,5
         relative to address ranges. */

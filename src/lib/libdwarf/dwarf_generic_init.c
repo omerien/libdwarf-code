@@ -88,6 +88,7 @@ dwarf_init_path_dl(path true_path and globals, dbg1
 #include "libdwarf_private.h"
 #include "dwarf_base_types.h"
 #include "dwarf_opaque.h"
+#include "dwarf_alloc.h"
 #include "dwarf_error.h"
 #include "dwarf_object_detector.h"
 

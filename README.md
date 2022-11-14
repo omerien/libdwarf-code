@@ -1,17 +1,18 @@
-[![autotools CI](https://github.com/davea42/libdwarf-code/actions/workflows/ci_linux_autotools.yml/badge.svg)](https://github.com/davea42/libdwarf-code/actions/workflows/ci_linux_autotools.yml)
-[![meson CI](https://github.com/davea42/libdwarf-code/actions/workflows/ci_meson.yml/badge.svg)](https://github.com/davea42/libdwarf-code/actions?query=workflows/ci_meson.yml)
-[![msys2 CI](https://github.com/davea42/libdwarf-code/actions/workflows/ci_msys2.yml/badge.svg)](https://github.com/davea42/libdwarf-code/actions/workflows/ci_msys2.yml)
-[![linux_cmake CI](https://github.com/davea42/libdwarf-code/actions/workflows/ci_linux_cmake.yml/badge.svg)](https://github.com/davea42/libdwarf-code/actions/workflows/ci_linux_cmake.yml)
-[![Travis Build Status](https://travis-ci.com/davea42/libdwarf-code.svg?branch=master)](https://travis-ci.com/github/davea42/libdwarf-code)
+# This is libdwarf README[.md]
 
-The 'no status' reports above are a temporary issue with github,
-they are actually passing.
+Updated 6 November 2022
 
-# This is libdwarf README.md
+ci runs builds on Linux, Freebsd, msys2, and MacOS
+using configure,cmake, and meson.
 
-Updated 15 April 2022
+[![ci](https://github.com/davea42/libdwarf-code/actions/workflows/test.yml/badge.svg)](https://github.com/davea42/libdwarf-code/actions/workflows/test.yml)
 
-For release libdwarf-0.4.0 
+Version 0.4.2 released 13 September 2022
+Versions before 0.4.2 had problems
+in the test suite so make check or ninja test might fail
+on some tests (sorry).
+
+Version 0.5.0 is not released. 
 
 ## REQUIREMENTS from a libdwarf<name>.tar.xz
 
@@ -20,17 +21,33 @@ in your base OS release. Restricting attention
 here to just building libdwarf and dwarfdump. 
 
 If the objects you work with do not have
-compressed-elf-section content zlib/libz
-are not required for building/using 
+section content compressed
+with zlib(libz) or libzstd
+neither those libraries nor their header files
+are required for building/using 
 libdwarf/dwarfdump.
 
     Ubuntu: 
-    sudo apt install pkgconf zlib1g zlib1g-dev
-    optional add: cmake meson 
+    sudo apt install pkgconf zlib1g zlib1g-dev libzstd1
+    # Use of libzstd1 is new in 0.4.3
+    # zlib1g zlib1g-dev libzstd1 are all optional but
+    # are required to read any DWARF data in compressed
+    # sections.
+    optional add: cmake meson ninja doxygen 
 
     FreeBSD:
-    pkg install bash python3 gmake binutils pkgconf lzlib
-    optional add: cmake meson
+    pkg install bash python3 gmake binutils pkgconf lzlib zstd 
+    # libzstd is likely in /usr/local/lib and zstd.h
+    # in /usr/local/include and the compiler will not look there
+    # by default. All will still build fine without it and
+    # without lzib too, though compressed DWARF sections
+    # may not be readable.
+    # lzlib zstd all optional, but needed to read compressed
+    # DWARF sections. 
+    optional add: cmake meson ninja doxygen
+
+    Ensure that all the needed programs are in $PATH,
+    including python3.  
 
 ## BUILDING from a libdwarf<name>.tar.xz
 
@@ -40,14 +57,19 @@ These examples show doing a build in a directory
 different than the source as that is generally
 recommended practice. 
 
-### GNU configure build
+### GNU configure/autotools build
 
+Note: if you get a build failure that mentions
+something about test/ and missing .Po object files
+add --disable-dependency-tracking to the configure
+command.
+    
     rm -rf /tmp/build
     mkdir /tmp/build
     cd /tmp
-    tar xf <path to>/libdwarf-0.4.0.tar.xz
+    tar xf <path to>/libdwarf-0.4.2.tar.xz
     cd  /tmp/build
-    /tmp/libdwarf-0.4.0/configure
+    /tmp/libdwarf-0.4.2/configure
     make
     make check
 
@@ -55,36 +77,44 @@ recommended practice.
 
 README.cmake has details on the available cmake options.
 
-Just like configure, except instead of configure do:
-
-    cmake  /tmp/libdwarf-0.4.0
-    make
-    ctest -R self
+We suggest that you will find meson a more satisfactory
+tool.
 
 ### meson build
 
     meson 0.45.1  on Ubuntu 18.04 fails.
-    meson 0.55.2  on Ubunto 20.04 works.
+    meson 0.55.2  on Ubuntu 20.04 works.
     meson 0.60.3  on Freebsd 12.2 and Freebsd 13.0 works.
 
+See README.cmake for the mingw64 msys2 packages to install
+and the command(s) to do that in msys2.
+The tools listed there are also for msys2 meson and
+autotools/configure.
 
-For the simplest example:
+The msys2 meson ninja install not only installs libdwarf-0.dll
+and dwarfdump.exe it updates the executables in
+the build tree linking to that dll so all such
+executables in the build tree work too.
 
-    meson /tmp/libdwarf-0.4.0
-    ninja -j8
+For example (all build environments):
 
-For a faster build with install and sanity tests:
-
-    prefx=/tmp/installtargetmeson
-    export CFLAGS="-g -pipe"
-    export CXXFLAGS="-g -pipe"
-    meson /tmp/libdwarf-0.4.0  \
-      --prefix=$prefx \
-      --default-library shared
-    ninja -j8 install
+    meson /tmp/libdwarf-0.4.2
+    ninja
+    ninja install
     ninja test
 
-## BUILDING from a git clone of the source tree with configure
+For a faster build, adding additional checks:
+
+    export CFLAGS="-g -pipe"
+    export CXXFLAGS="-g -pipe"
+    meson /tmp/libdwarf-0.4.2 -Ddwarfexample=true 
+    ninja -j8
+    ninja install
+    ninja test
+
+## BUILDING on linux from a git clone with configure/autotools
+
+Ignore this section if using meson (or cmake).
 
 This is not recommended as it requires you have
 GNU autotools and pkg-config installed.
@@ -96,9 +126,15 @@ For example, on Ubuntu 20.04
     sudo apt-get install autoconf libtool pkg-config
 ```
 
-Using the source/build directories from above as examples,
-do:
+Note: if you get a build failure that mentions
+something about test/ and missing .Po object files
+add --disable-dependency-tracking to the configure
+command.
 
+Using the source/build directories from above as examples,
+do :
+
+    # Standard Linux Build
     cd /path/to/code
     sh autogen.sh
     cd /tmp/build
@@ -106,26 +142,51 @@ do:
     make
     make check
 
-## BUILDING from a git clone of the source tree with cmake
+## BUILDING on MacOS from a git clone configure
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    brew install autoconf automake libtool
+    # Then use the  Standard Linux Build lines above.
 
-It's always recommended to do cmake builds in a clean directory.
-See also README.cmake
-Instead of configure do:
+### Options to meson on Linux/Unix 
 
-    cmake  /path/to/code
-    make
-    ctest -R self
+For the basic configuration options list , do:
+    meson configure /path/to/code
 
-### Options to configure on Linux/Unix 
+To set options and show the resulting actual options:
+
+    # Here  just setting one option.
+    meson setup  -Ddwarfexample=true  .  /home/davea/dwarf/code 
+    meson configure .
+
+The meson configure output is very wide (just letting you know).
+
+### Options to configure/autotools on Linux/Unix 
+
+For the full options list , do:
+
+    /path/to/code/configure --help
 
 By default configure compiles and uses libdwarf.a.
 With `--enable-shared` appended to the configure step,
 both libdwarf.a and libdwarf.so
 are built and the runtimes built will reference libdwarf.so.
 
-With `--enable-shared --disable-static`
-appended to the configure step,
- libdwarf.so is built and used; libdwarf.a is not built.
+If you get a build failure that mentions
+something about test/ and missing .Po object files
+add --disable-dependency-tracking to the configure
+command. With that option do not assume you can
+alter source files and have make rebuild all
+necessary.
+
+See:
+https://www.gnu.org/savannah-checkouts/gnu/automake/history/automake-history.html#Dependency-Tracking-Evolution
+
+With 
+
+    --enable-shared --disable-static
+
+appended to the configure command
+libdwarf.so is built and used but libdwarf.a is not built.
 
 Other options of possible interest:
 
@@ -135,15 +196,26 @@ Other options of possible interest:
     configure -h     shows the options available.  
 
 Sanity checking:
- gcc has some checks that can be done at runtime.
- -fsanitize=undefined is turned on by --enable-sanitize
 
-### Options to configure on Windows
+gcc has some checks that can be done at runtime.
+-fsanitize=undefined is turned on by --enable-sanitize
+
+### Options to meson on Windows (Msys2)
 
 All libdwarf builds are automatically shared object (dll)
-builds. No static libdwarf.a is supported.
+builds. No static library libdwarf.a for installation
+is supported.
 
-### Distributing
+Has the same meson setup reporting as on Linux (above).
+
+### Options to configure on Windows (Msys2)
+
+All libdwarf builds are automatically shared object (dll)
+builds. No static libdwarf.a can be installed.
+
+Has the same meson setup reporting as on Linux (above).
+
+### Distributing via configure/autotools
 
 When ready to create a new source distribution do
 a build and then
@@ -152,18 +224,38 @@ a build and then
 
 # INCOMPATIBILITIES. Changes to interfaces
 
-Comparing libdwarf-0.4.0 to libdwarf-0.3.4
+### Comparing libdwarf-0.5.0 to libdwarf-0.4.2
+Not released.
+dwarf\_get\_globals() is compatible but it now
+returns data from .debug\_names in addition
+to .debug\_pubnames (either or both
+could be in an object file).
+New function dwarf\_global\_tag\_number()
+makes the data from .debug\_names a bit
+more useful (if a library user wants it).
+
+### Comparing libdwarf-0.4.2 to libdwarf-0.4.1
+No incompatibilities.
+
+### Comparing libdwarf-0.4.1 to libdwarf-0.4.0
+Added a new function dwarf\_suppress\_debuglink\_crc()
+which speeds up gnu debuglink (only use it if
+you are sure the debuglink name-check alone is sufficient).
+
+### Comparing libdwarf-0.4.0 to libdwarf-0.3.4
 A few  dealloc() functions changed name to have
 a consistent pattern for all such.
-Access to the DWARF5 .debug_names section
+Access to the DWARF5 .debug\_names section
 is now fully implemented. 
 
 See the <strong>Recent Changes</strong> section in
 libdwarf.pdf (in the release).
 
 [dwhtml]: https://www.prevanders.net/libdwarfdoc/index.html
+[dwpdf]: https://www.prevanders.net/libdwarf.pdf
 
-Or see [the latest online html version] [dwhtml] for the details..
+Or see the latest online html version [dwhtml] for the details..
+Or see (via download) the latest pdf html version [dwpdf].
 
 Notice the table of contents at the right edge of the html page.
 
@@ -194,5 +286,9 @@ with no file system involved
 see
 
     src/bin/dwarfexample/jitreader.c
+
+and see the html [dwhtml] (www.prevanders.net/libdwarfdoc/index.html).
+
+The latest pdf is [dwpdf] (www.prevanders.net/libdwarf.pdf) 
 
 David Anderson.

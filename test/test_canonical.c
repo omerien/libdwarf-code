@@ -4,16 +4,14 @@
   This trivial test program is hereby placed in the public domain.
 */
 
-#include "config.h"
-#include <stdio.h>
-#if defined(_WIN32) && defined(HAVE_STDAFX_H)
-#include "stdafx.h"
-#endif /* HAVE_STDAFX_H */
-#include <string.h>  /* strcpy() strlen() */
-#include <stddef.h>
-#include "dwarf.h"
-#include "libdwarf.h"
+#include <config.h>
+
+#include <stdio.h>  /* printf() */
+#include <string.h>  /* strcmp() */
 #include "dd_canonical_append.h"
+#include "dd_minimal.h"
+
+void dd_minimal_count_global_error(void) {}
 
 #define CANBUF 25
 static struct canap_s {

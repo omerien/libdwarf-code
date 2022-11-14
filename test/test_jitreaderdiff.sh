@@ -1,11 +1,8 @@
 #!/bin/sh
 #
-if [ x$DWTOPSRCDIR = "x" ]
-then
-  t=$top_blddir
-else
-  t=$DWTOPSRCDIR
-fi
+# Makefile.am   set env var DWTOPSRCDIR, no args
+# CMakeLIsts.txt pass in 2 args  1.top source dir 
+#    no env vars.
 
 chkres() {
 r=$1 
@@ -15,30 +12,43 @@ then
   echo "FAIL $m.  Exit status for the test $r"
 fi 
 }
+
 echo "Argument count: $#"
-if [ $# -eq 2 ]
+blddir=`pwd`
+bname=`basename $blddir`
+top_blddir="$blddir"
+if [ x$bname = "xtest" ]
+then
+  # Running in-source-tree.
+  top_blddir="$blddir/.."
+fi
+if [ $# -gt 0  ]
 then
   DWTOPSRCDIR="$1"
-  blddir="$2"
-  top_blddir=$blddir
-else
-  # DWTOPSRCDIR an env var.
-  blddir=`pwd`
-  top_blddir=`dirname $blddir`
+  echo  "DWTOPSRCDIR from arg $1"
+  export DWTOPSRCDIR
 fi
+
 if [ x$DWTOPSRCDIR = "x" ]
 then
+  # Assume runing tests in source
   top_srcdir=$top_blddir
-  echo "top_srcdir from top_blddir $top_srcdir"
+  echo "set DWTOPSRCDIR from top_blddir: $top_blddir"
+  DWTOPSRCDIR=$top_blddir
+  export DWTOPSRCDIR
 else
   top_srcdir=$DWTOPSRCDIR
-  echo "top_srcdir from DWTOPSRCDIR $top_srcdir"
+  echo "set top_srcdir from DWTOPSRCDIR: $top_srcdir"
 fi
 if [ "x$top_srcdir" = "x.." ]
 then
   # This case hopefully eliminates relative path to test dir.
   top_srcdir=$top_blddir
+  DWTOPSRCDIR=$top_blddir
+  echo "set DWTOPSRCDIR from top_blddir: $top_blddir"
+  export DWTOPSRCDIR
 fi
+
 # bldloc is the executable directories.
 bldloc=$top_blddir/src/bin/dwarfexample
 #localsrc is the source dir with baseline data
@@ -51,29 +61,30 @@ echo "TOP topbld  : $top_blddir"
 echo "TOP localsrc: $localsrc"
 
 b=$top_srcdir/test/jitreader.base
+localsrc=$top_srcdir/test
 testbin=$top_blddir/test
 tx=$testbin/junk.jitreader.new
 jr=$top_blddir/src/bin/dwarfexample/jitreader
 
+rm -f $tx
+echo "Running: $jr with env var DWTOPSRCDIR: $DWTOPSRCDIR"
+$jr
 $jr > $tx
 r=$?
 chkres $r "$jr printing output to $tx base $b "
 if [ $r -ne 0 ]
 then
-  echo " failed"
-  exit $r
+   cat $tx
+   exit $r
 fi
-echo "if update required, mv $tx $b"
-diff $b $tx > $tx.diff
+echo "Running: python3 ${localsrc}/test_dwdiff.py $b $tx" 
+python3 ${localsrc}/test_dwdiff.py $b $tx
 r=$?
-chkres $r "FAIL jitreader.sh diff of $b $tx"
 if [ $r -ne 0 ]
 then
-  echo "Showing diff $b $tx"
-  diff $b $tx
+  echo "Failed diff above."
   echo "To update , mv  $tx $b"
   exit $r
 fi
 rm -f $tx
-rm -f $tx.diff
 exit 0

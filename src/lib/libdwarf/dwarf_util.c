@@ -58,12 +58,6 @@
 
 #define MINBUFLEN 1000
 
-#if _WIN32
-#define NULL_DEVICE_NAME "NUL"
-#else
-#define NULL_DEVICE_NAME "/dev/null"
-#endif /* _WIN32 */
-
 #define MORE_BYTES      0x80
 #define DATA_MASK       0x7f
 #define DIGIT_WIDTH     7
@@ -1389,6 +1383,12 @@ _dwarf_what_section_are_we(Dwarf_Debug dbg,
         our_pointer, section_name_out,
         sec_start_ptr_out, sec_len_out, sec_end_ptr_out);
     FINDSEC(&dbg->de_debug_frame_eh_gnu,
+        our_pointer, section_name_out,
+        sec_start_ptr_out, sec_len_out, sec_end_ptr_out);
+    FINDSEC(&dbg->de_gnu_debuglink,
+        our_pointer, section_name_out,
+        sec_start_ptr_out, sec_len_out, sec_end_ptr_out);
+    FINDSEC(&dbg->de_note_gnu_buildid,
         our_pointer, section_name_out,
         sec_start_ptr_out, sec_len_out, sec_end_ptr_out);
     return DW_DLV_NO_ENTRY;

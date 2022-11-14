@@ -24,7 +24,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
       message(STATUS "Using MT runtime by CMAKE_MSVC_RUNTIME_LIBRARY")
       set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     elseif(LIBDWARF_CRT STREQUAL "MD")
-    message(STATUS "Using MD runtime by CMAKE_MSVC_RUNTIME_LIBRARY")
+      message(STATUS "Using MD runtime by CMAKE_MSVC_RUNTIME_LIBRARY")
       set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     else()
       message(FATAL_ERROR "LIBDWARF_CRT must be MT or MD")
@@ -100,7 +100,7 @@ include(CheckCSourceCompiles)
 include(CheckCSourceRuns)
 include(CheckSymbolExists)
 ### Version also appears in configure.ac
-set(VERSION 0.4.0)
+set(VERSION 0.5.0)
 set(PACKAGE_VERSION "\"${VERSION}\"") 
 set(PACKAGE_NAME "libdwarf" )
 set(PACKAGE_STRING "\"${PACKAGE_NAME} ${VERSION}\"")
@@ -283,6 +283,43 @@ if (HAVE_ZLIB)
   # For linking in libz
   set(DW_FZLIB "z")
 endif()
+
+set(CMAKE_REQUIRED_LIBRARIES zstd )
+check_c_source_compiles( [=[
+  #include "zstd.h"
+  int main()
+  {
+      char * dest[100];
+      size_t destlen = 100;
+      char *src = 0;
+      size_t srclen = 3;
+      size_t res = ZSTD_decompress(dest,destlen,src,srclen);
+      if (res == destlen) {
+           /* ALL IS WELL */
+      }
+      return 0;
+  } ]=]  HAVE_ZSTD )
+check_c_source_compiles( [=[
+  #include "zstd.h"
+  int main()
+  {
+      char * dest[100];
+      size_t destlen = 100;
+      char *src = 0;
+      size_t srclen = 3;
+      size_t res = ZSTD_decompress(dest,&destlen,src,srclen);
+      if (res == destlen) {
+           /* ALL IS WELL */
+      }
+      return 0;
+  } ]=]  HAVE_ZSTD_H )
+set(CMAKE_REQUIRED_LIBRARIES)
+if (HAVE_ZSTD)
+  # For linking in libz
+  set(DW_FSTD "zstd")
+endif()
+
+
 
 check_c_source_compiles([=[
 #include <stdint.h>

@@ -45,6 +45,7 @@
 #include "dd_safe_strcpy.h"
 #include "dd_command_options.h"
 #include "dd_compiler_info.h"
+#include "libdwarf_private.h" /* For malloc/calloc debug */
 
 /* Record compilers  whose CU names have been seen.
    Full CU names recorded here, though only a portion
@@ -80,10 +81,9 @@ static int current_compiler = -1;
 static Dwarf_Bool current_cu_is_checked_compiler = TRUE;
 
 static int
-hasprefix(const char *sample, const char *prefix)
+has_cu_producer_prefix(const char *prefix)
 {
-    unsigned prelen = strlen(prefix);
-    if (strncmp(sample,prefix,prelen) == 0) {
+    if (strncmp(glflags.CU_producer,prefix,strlen(prefix)) == 0) {
         return TRUE;
     }
     return FALSE;
@@ -206,18 +206,19 @@ add_cu_name_compiler_target(char *name)
     Compiler *pCompiler = 0;
 
     if (current_compiler < 1) {
-        fprintf(stderr,"Current  compiler set to %d, cannot add "
+        printf("ERROR Current  compiler set to %d, cannot add "
             "Compilation unit name.  Giving up.",current_compiler);
-        exit(FAILED);
+        exit(EXIT_FAILURE);
     }
     pCompiler = &compilers_detected[current_compiler];
     cu_last = pCompiler->cu_last;
     /* Record current cu name */
     nc = (a_name_chain *)malloc(sizeof(a_name_chain));
     if (!nc) {
-        fprintf(stderr,"Out of memory "
+        printf("ERROR Out of memory "
             "allocating compiler target %s "
             "(not saved)\n",name);
+        glflags.gf_count_major_errors++;
         return;
     }
     nc->item = makename(name);
@@ -276,10 +277,8 @@ update_compiler_target(const char *producer_name)
         }
     } else {
         /* Internally the strings do not include quotes */
-        Dwarf_Bool snc_compiler =
-            hasprefix(glflags.CU_producer,"SN") ? TRUE : FALSE;
-        Dwarf_Bool gcc_compiler =
-            hasprefix(glflags.CU_producer,"GNU") ? TRUE : FALSE;
+        Dwarf_Bool snc_compiler = has_cu_producer_prefix("SN");
+        Dwarf_Bool gcc_compiler = has_cu_producer_prefix("GNU");
         current_cu_is_checked_compiler =
             glflags.gf_check_all_compilers ||
             (snc_compiler && glflags.gf_check_snc_compiler) ||

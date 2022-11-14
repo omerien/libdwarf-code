@@ -52,6 +52,7 @@
 #include "dd_compiler_info.h"
 #include "dd_regex.h"
 #include "dd_safe_strcpy.h"
+#include "libdwarf_private.h" /* For malloc/calloc debug */
 
 static const char *remove_quotes_pair(const char *text);
 static char *special_program_name(char *n);
@@ -127,6 +128,7 @@ do_all(void)
         and dwarf_pubtypes. */
     glflags.gf_weakname_flag = TRUE; /* SGI only*/
     glflags.gf_gnu_debuglink_flag = FALSE;
+    glflags.gf_debug_addr_flag = FALSE;
     glflags.gf_debug_names_flag = TRUE;
     glflags.gf_debug_sup_flag = TRUE;
 }
@@ -135,10 +137,10 @@ static int
 get_number_value(char *v_in,long int *v_out)
 {
     long int v= 0;
-    size_t len = strlen(v_in);
+    size_t lenszt = strlen(v_in);
     char *endptr = 0;
 
-    if (len < 1) {
+    if (lenszt < 1) {
         return DW_DLV_ERROR;
     }
     v = strtol(v_in,&endptr,10);
@@ -168,9 +170,9 @@ remove_quotes_pair(const char *text)
     static char double_quote = '\"';
     char quote = 0;
     const char *p = text;
-    int textlen = strlen(text);
+    size_t textlenszt = strlen(text);
 
-    if (textlen < 2) {
+    if (textlenszt < 2) {
         return p;
     }
 
@@ -186,14 +188,14 @@ remove_quotes_pair(const char *text)
         }
     }
     {
-        if (p[textlen - 1] == quote) {
-            char *altered = calloc(1,textlen+1);
+        if (p[textlenszt - 1] == quote) {
+            char *altered = calloc(1,textlenszt+1);
             const char *str2 = 0;
 
             /*  Here we delete the leading and trailing quote chars.
-                Start at p-1. String is to be orig textlen - 2
+                Start at p-1. String is to be orig textlenszt - 2
                 bytes long */
-            dd_safe_strcpy(altered,textlen+1,p+1,textlen-2);
+            dd_safe_strcpy(altered,textlenszt+1,p+1,textlenszt-2);
             str2 =  makename(altered);
             free(altered);
             return str2;
@@ -220,13 +222,13 @@ special_program_name(char *n)
     char * mp = "/dwarfdump.O";
     char * revstr = "/dwarfdump";
     char *cp = n;
-    size_t mslen = strlen(mp);
+    size_t mslenszt = strlen(mp);
 
     for ( ; *cp; ++cp) {
         if (*cp == *mp) {
-            if (!strncmp(cp,mp,mslen)){
+            if (!strncmp(cp,mp,mslenszt)){
                 esb_append(glflags.newprogname,revstr);
-                cp += mslen-1;
+                cp += mslenszt-1;
             } else {
                 esb_appendn(glflags.newprogname,cp,1);
             }
@@ -260,8 +262,10 @@ uri_data_destructor(void)
     esb_destructor(&uri_esb_data);
 }
 /*  The strings whose pointers are returned here
-    from makename are never destructed, but
-    that is ok since there are only about 10 created at most.  */
+    from makename are destructed at dwarf_finish.
+    makename() never returns NULL, so
+    do_uri_translation() never does so either.
+*/
 const char *
 do_uri_translation(const char *s,const char *context)
 {
@@ -313,6 +317,7 @@ static void arg_check_self_refs(void);
 static void arg_check_show(void);
 static void arg_check_silent(void);
 static void arg_check_summary(void);
+static void arg_suppress_debuglink_crc(void);
 static void arg_check_tag_attr(void);
 static void arg_check_tag_tag(void);
 static void arg_check_type(void);
@@ -374,6 +379,7 @@ static void arg_print_all(void);
 static void arg_print_abbrev(void);
 static void arg_print_aranges(void);
 static void arg_print_debug_frame(void);
+static void arg_print_debug_addr(void);
 static void arg_print_debug_names(void);
 static void arg_print_gnu_debuglink(void);
 static void arg_print_debug_gnu(void);
@@ -430,6 +436,7 @@ static void arg_trace(void);
 static void arg_verbose(void);
 static void arg_version(void);
 static void arg_show_dwarfdump_conf(void);
+static void arg_show_args(void);
 
 static void arg_c_multiple_selection(void);
 static void arg_E_multiple_selection(void);
@@ -482,6 +489,7 @@ static const char *usage_long_text[] = {
 "                         .note.gnu.build-id",
 "     --print-gnu-debuglink Print .gnu_debuglink,",
 "                         .note.gnu.build-id sections",
+"     --print-debug-addr  Print .debug_addr section",
 "     --print-debug-gnu   Print .debug_gnu_pubtypes and",
 "                         .debug_gnu_pubnames sections",
 "     --print-debug-names Print .debug_names section",
@@ -632,10 +640,15 @@ static const char *usage_long_text[] = {
 "-------------------------------------------------------------------",
 " --no-follow-debuglink       Do not follow GNU debuglink, ",
 "                             just use the file directly so,",
-"                             debuglink  global paths are ignored.",
+"                             debuglink  global paths ",
+"                             and debugid links are ignored.",
 " --add-debuglink_path=<text> Add the path to the list of",
 "                             global paths debuglink searches",
-
+" --suppress-debuglink-crc    Tell libdwarf to avoid calculating",
+"                             crc values, saving some runtime at",
+"                             startup and removing a ",
+"                             safety check but allowing debuglink",
+"                             and debugid paths to be used.",
 "-------------------------------------------------------------------",
 "Search text in attributes",
 "-------------------------------------------------------------------",
@@ -668,6 +681,13 @@ static const char *usage_long_text[] = {
 "-vv  --verbose-more  Show even more information.",
 "-V   --version       Print version information.",
 "     --show-dwarfdump-conf Show what dwarfdump.conf is being used",
+"     --show-args    Show the  current date, time, library version,",
+"                    dwarfdump version, and command arguments",
+"     --suppress-de-alloc-tree Turns off the libdwarf-cleanup of",
+"                    libdwarf-allocated memory on calling",
+"                    dwarf_finish(). Used to test that",
+"                    dwarfdump does dealloc everywhere",
+"                    it should for minimum memory use.",
 "",
 };
 
@@ -761,6 +781,7 @@ OPT_PRINT_ABBREV,             /* -b   --print-abbrev      */
 OPT_PRINT_ALL,                /* -a   --print-all         */
 OPT_PRINT_ARANGES,            /* -r   --print-aranges     */
 OPT_PRINT_DEBUG_NAMES,        /*      --print-debug-names */
+OPT_PRINT_DEBUG_ADDR,         /*      --print-debug-addr */
 OPT_PRINT_GNU_DEBUGLINK,      /*      --print-gnu-debuglink  */
 OPT_PRINT_DEBUG_GNU,          /*      --print-debug-gnu   */
 OPT_PRINT_DEBUG_SUP,          /*      --print-debug-sup   */
@@ -798,7 +819,8 @@ OPT_RELOC_RANGES,             /* -oR  --reloc-ranges      */
 
 /* debuglink options */
 OPT_NO_FOLLOW_DEBUGLINK,     /* --no-follow-debuglink */
-OPT_ADD_DEBUGLINK_PATH,       /* --add-debuglink-path=<text> */
+OPT_ADD_DEBUGLINK_PATH,      /* --add-debuglink-path=<text> */
+OPT_SUPPRESS_DEBUGLINK_CRC,  /* --suppress-debuglink-crc */
 
 /* Search text in attributes                        */
 OPT_SEARCH_ANY,       /* -S any=<text>   --search-any=<text>  */
@@ -819,6 +841,7 @@ OPT_VERBOSE,                  /* -v  --verbose               */
 OPT_VERBOSE_MORE,             /* -vv --verbose-more          */
 OPT_VERSION,                  /* -V  --version               */
 OPT_SHOW_DWARFDUMP_CONF,      /*   --show-dwarfdump-conf     */
+OPT_SHOW_ARGS,                /*   --show-args               */
 
 /* Trace                                                     */
 OPT_TRACE,                    /* -# --trace=<num>            */
@@ -932,6 +955,7 @@ OPT_FORMAT_SUPPRESS_OFFSETS },
 {"print-abbrev",      dwno_argument, 0, OPT_PRINT_ABBREV     },
 {"print-all",         dwno_argument, 0, OPT_PRINT_ALL        },
 {"print-aranges",     dwno_argument, 0, OPT_PRINT_ARANGES    },
+{"print-debug-addr",  dwno_argument, 0, OPT_PRINT_DEBUG_ADDR},
 {"print-debug-names", dwno_argument, 0, OPT_PRINT_DEBUG_NAMES},
 {"print-gnu-debuglink", dwno_argument,0,OPT_PRINT_GNU_DEBUGLINK},
 {"print-debug-gnu",   dwno_argument, 0, OPT_PRINT_DEBUG_GNU  },
@@ -971,6 +995,8 @@ OPT_FORMAT_SUPPRESS_OFFSETS },
 /*  GNU debuglink options */
 {"no-follow-debuglink", dwno_argument, 0,OPT_NO_FOLLOW_DEBUGLINK},
 {"add-debuglink-path", dwrequired_argument, 0,OPT_ADD_DEBUGLINK_PATH},
+{"suppress-debuglink-crc", dwno_argument, 0,
+    OPT_SUPPRESS_DEBUGLINK_CRC},
 
 /* Search text in attributes. */
 {"search-any",            dwrequired_argument, 0,OPT_SEARCH_ANY  },
@@ -996,6 +1022,7 @@ OPT_FORMAT_SUPPRESS_OFFSETS },
 {"verbose-more",  dwno_argument, 0, OPT_VERBOSE_MORE },
 {"version",       dwno_argument, 0, OPT_VERSION      },
 {"show-dwarfdump-conf",dwno_argument, 0, OPT_SHOW_DWARFDUMP_CONF },
+{"show-args",     dwno_argument, 0, OPT_SHOW_ARGS },
 
 /* Trace. */
 {"trace", dwrequired_argument, 0, OPT_TRACE},
@@ -1005,6 +1032,11 @@ OPT_FORMAT_SUPPRESS_OFFSETS },
 };
 
 /*  Handlers for the command line options. */
+/*  Option '--print-debug-addr' */
+void arg_print_debug_addr(void)
+{
+    glflags.gf_debug_addr_flag = TRUE;
+}
 
 /*  Option '--print-debug-names' */
 void arg_print_debug_names(void)
@@ -1041,7 +1073,9 @@ void arg_trace(void)
     }
     /* Display dwarfdump debug options. */
     if (dump_options) {
-        print_usage_message(glflags.program_name,usage_debug_text);
+        print_usage_message(usage_debug_text);
+        makename_destructor();
+        global_destructors();
         exit(OKAY);
     }
 }
@@ -1106,9 +1140,10 @@ void arg_format_producer(void)
     /*  Assume a compiler version to check,
         most likely a substring of a compiler name.  */
     if (!record_producer(dwoptarg)) {
-        fprintf(stderr, "Compiler table max %d exceeded, "
+        printf("ERROR: Compiler table max %d exceeded, "
             "limiting the tracked compilers to %d\n",
             COMPILER_TABLE_MAX,COMPILER_TABLE_MAX);
+        glflags.gf_count_major_errors++;
     }
 }
 
@@ -1339,7 +1374,9 @@ void arg_h_multiple_selection(void)
 /*  Option '-h' */
 void arg_help(void)
 {
-    print_usage_message(glflags.program_name,usage_long_text);
+    print_usage_message(usage_long_text);
+    makename_destructor();
+    global_destructors();
     exit(OKAY);
 }
 
@@ -1992,6 +2029,12 @@ void arg_no_follow_debuglink(void)
     glflags.gf_no_follow_debuglink = TRUE;
 }
 
+/*  Option --suppress-debuglink-crc */
+void arg_suppress_debuglink_crc(void)
+{
+    dwarf_suppress_debuglink_crc(1);
+}
+
 static int
 insert_debuglink_path(char *p)
 {
@@ -2003,20 +2046,22 @@ insert_debuglink_path(char *p)
 
     newarray = (char **)malloc(newcount * sizeof(char *));
     if (!newarray) {
-        fprintf(stderr,"ERROR Unable to malloc space for"
+        printf("ERROR Unable to malloc space for"
             " debuglink paths. "
             " malloc %u pointers failed.\n",newcount);
-        fprintf(stderr,"Global debuglink path ignored: %s\n",
+        printf("Global debuglink path ignored: %s\n",
             sanitized(p));
+        glflags.gf_count_major_errors++;
         return DW_DLV_ERROR;
     }
     pstr = strdup(p);
     if (!pstr) {
-        fprintf(stderr,"ERROR Unable to malloc space"
+        printf("ERROR Unable to malloc space"
             " for debuglink path: "
             "count stays at %u\n",curcount);
-        fprintf(stderr,"Global debuglink path ignored: %s\n",
+        printf("Global debuglink path ignored: %s\n",
             sanitized(p));
+        glflags.gf_count_major_errors++;
         free(newarray);
         return DW_DLV_ERROR;
     }
@@ -2033,11 +2078,11 @@ insert_debuglink_path(char *p)
 /*  Option --add-debuglink-path=<text> */
 void arg_add_debuglink_path(void)
 {
-    int res = 0;
     if (strncmp(dwoptarg,"add-debuglink-path=",21) == 0) {
         dwoptarg = &dwoptarg[21];
         if (strlen(dwoptarg)) {
-            /*  dosomething debuglink  FIXME */
+            int res = 0;
+
             res = insert_debuglink_path(dwoptarg);
             if (res == DW_DLV_OK) {
                 return;
@@ -2058,6 +2103,13 @@ void arg_search_any(void)
     glflags.gf_search_is_on = TRUE;
     glflags.search_any_text = makename(dwoptarg);
     tempstr = remove_quotes_pair(glflags.search_any_text);
+    if (!tempstr){
+        printf("ERROR regcomp: unable to compile "
+            " search expression %s, out of memory\n",
+            glflags.search_any_text);
+        glflags.gf_count_major_errors++;
+        return;
+    }
     glflags.search_any_text = do_uri_translation(tempstr,ctx);
     if (strlen(glflags.search_any_text) <= 0) {
         arg_search_invalid();
@@ -2082,6 +2134,13 @@ void arg_search_match(void)
     glflags.gf_search_is_on = TRUE;
     glflags.search_match_text = makename(dwoptarg);
     tempstr = remove_quotes_pair(glflags.search_match_text);
+    if (!tempstr){
+        printf("regcomp: unable to compile "
+            " search expression match=%s, out of memory\n",
+            glflags.search_match_text);
+        glflags.gf_count_major_errors++;
+        return;
+    }
     glflags.search_match_text = do_uri_translation(tempstr,ctx);
     if (strlen(glflags.search_match_text) <= 0) {
         arg_search_invalid();
@@ -2108,15 +2167,23 @@ void arg_search_regex(void)
     glflags.gf_search_is_on = TRUE;
     glflags.search_regex_text = makename(dwoptarg);
     tempstr = remove_quotes_pair(glflags.search_regex_text);
+    if (!tempstr){
+        printf("regcomp: unable to compile "
+            " search regular expression %s, out of memory\n",
+            glflags.search_regex_text);
+        glflags.gf_count_major_errors++;
+        return;
+    }
     glflags.search_regex_text = do_uri_translation(tempstr,ctx);
-    if (strlen(glflags.search_regex_text) > 0) {
+    if (glflags.search_regex_text &&
+        strlen(glflags.search_regex_text) > 0) {
         res = dd_re_comp(glflags.search_regex_text);
 
         if (res != DW_DLV_OK) {
-            fprintf(stderr,
-                "regcomp: unable to compile "
+            printf("regcomp: unable to compile "
                 " search regular expression %s\n",
                 glflags.search_regex_text);
+            glflags.gf_count_major_errors++;
         }
     } else {
         arg_search_invalid();
@@ -2182,6 +2249,8 @@ void arg_format_file(void)
     const char *tstr = 0;
     glflags.gf_cu_name_flag = TRUE;
     tstr = do_uri_translation(dwoptarg,ctx);
+    if (!tstr) {
+    }
     esb_append(glflags.cu_name,tstr);
 }
 
@@ -2201,12 +2270,23 @@ void arg_show_dwarfdump_conf(void)
 {
     glflags.gf_show_dwarfdump_conf++;
 }
+/*  Option '--show-args'
+    which causes dwarfdump to print the current
+    version of the program, date, and time of the run,
+    and to show the command line arguments. */
+void arg_show_args(void)
+{
+    glflags.gf_show_args_flag = TRUE;
+}
 
 /*  Option '-V' */
 void arg_version(void)
 {
     /* Display dwarfdump compilation date and time */
-    print_version_details(glflags.program_fullname,TRUE);
+    arg_show_args();
+    print_version_details(glflags.program_fullname);
+    makename_destructor();
+    global_destructors();
     exit(OKAY);
 }
 
@@ -2405,43 +2485,47 @@ static void arg_print_types(void)
 /*  Option not supported */
 static void arg_not_supported(void)
 {
-    fprintf(stderr, "-%c is no longer supported:ignored\n",
+    printf("ERROR Option -%c is no longer supported:ignored\n",
         arg_option);
+    glflags.gf_count_major_errors++;
 }
 
 /* Error message for --add-debuglink-path=path  */
 static void arg_debuglink_path_invalid(void)
 {
-    fprintf(stderr,
-        "--add-debuglink-path=<text>\n");
-    fprintf(stderr, "is allowed, not  %s\n",dwoptarg);
+    printf("--add-debuglink-path=<text>\n");
+    /*  Add quotes around string so any invisible chars
+        kind of show up */
+    printf("is allowed, not  \"%s\"\n",dwoptarg);
+    glflags.gf_count_major_errors++;
     arg_usage_error = TRUE;
 
 }
 /*  Error message for invalid '-S' option. */
 static void arg_search_invalid(void)
 {
-    fprintf(stderr,
-        "-S any=<text> or -S match=<text> or"
+    printf("-S any=<text> or -S match=<text> or"
         " -S regex=<text>\n");
-    fprintf(stderr, "is allowed, not -S %s\n",dwoptarg);
+    printf("is allowed, not -S %s\n",dwoptarg);
     arg_usage_error = TRUE;
+    glflags.gf_count_major_errors++;
 }
 
 /*  Error message for invalid '-x' option. */
 static void arg_x_invalid(void)
 {
-    fprintf(stderr, "-x name=<path-to-conf> \n");
-    fprintf(stderr, " and  \n");
-    fprintf(stderr, "-x abi=<abi-in-conf> \n");
-    fprintf(stderr, " and  \n");
-    fprintf(stderr, "-x tied=<tied-file-path> \n");
-    fprintf(stderr, " and  \n");
-    fprintf(stderr, "-x line5={std,s2l,orig,orig2l} \n");
-    fprintf(stderr, " and  \n");
-    fprintf(stderr, "-x nosanitizestrings \n");
-    fprintf(stderr, "are legal, not -x %s\n", dwoptarg);
+    printf("-x name=<path-to-conf> \n");
+    printf(" and  \n");
+    printf("-x abi=<abi-in-conf> \n");
+    printf(" and  \n");
+    printf("-x tied=<tied-file-path> \n");
+    printf(" and  \n");
+    printf("-x line5={std,s2l,orig,orig2l} \n");
+    printf(" and  \n");
+    printf("-x nosanitizestrings \n");
+    printf("are legal, not -x %s\n", dwoptarg);
     arg_usage_error = TRUE;
+    glflags.gf_count_major_errors++;
 }
 
 /*  Process the command line arguments and set the
@@ -2611,6 +2695,7 @@ set_command_options(int argc, char *argv[])
         case OPT_PRINT_ALL:         arg_print_all();         break;
         case OPT_PRINT_ARANGES:     arg_print_aranges();     break;
         case OPT_PRINT_DEBUG_NAMES: arg_print_debug_names(); break;
+        case OPT_PRINT_DEBUG_ADDR:  arg_print_debug_addr();  break;
         case OPT_PRINT_GNU_DEBUGLINK: arg_print_gnu_debuglink();
             break;
         case OPT_PRINT_DEBUG_GNU:   arg_print_debug_gnu(); break;
@@ -2650,6 +2735,8 @@ set_command_options(int argc, char *argv[])
         /* debuglink attributes */
         case OPT_NO_FOLLOW_DEBUGLINK: arg_no_follow_debuglink();break;
         case OPT_ADD_DEBUGLINK_PATH: arg_add_debuglink_path();  break;
+        case OPT_SUPPRESS_DEBUGLINK_CRC:
+            arg_suppress_debuglink_crc(); break;
 
         /* Search text in attributes. */
         case OPT_SEARCH_ANY:            arg_search_any();
@@ -2676,6 +2763,8 @@ set_command_options(int argc, char *argv[])
         case OPT_VERSION:       arg_version();       break;
         case OPT_SHOW_DWARFDUMP_CONF:
             arg_show_dwarfdump_conf();break;
+        case OPT_SHOW_ARGS:
+            arg_show_args();break;
         /* Trace. */
         case OPT_TRACE: arg_trace(); break;
 
@@ -2710,8 +2799,11 @@ static const char *simplestdargs[] ={
 "-vvvvvv",
 "--verbose",
 "--show-dwarfdump-conf",
+"--show-args",
 "--verbose-more",
 "--suppress-de-alloc-tree",
+"--suppress-debuglink-crc",
+"--no-follow-debuglink",
 0
 };
 
@@ -2751,6 +2843,7 @@ lacking_normal_args (int argct,char **args)
 const char *
 process_args(int argc, char *argv[])
 {
+    /* the call sets up glflags.newprogname, returns its string */
     glflags.program_name = special_program_name(argv[0]);
     glflags.program_fullname = argv[0];
 
@@ -2806,7 +2899,9 @@ process_args(int argc, char *argv[])
         printf("%s option error.\n",glflags.program_name);
         printf("To see the options list: %s -h\n",
             glflags.program_name);
-        exit(FAILED);
+        makename_destructor();
+        global_destructors();
+        exit(EXIT_FAILURE);
     }
     if (dwoptind < (argc - 1)) {
         printf("Multiple apparent object file names "
@@ -2814,14 +2909,18 @@ process_args(int argc, char *argv[])
         printf("Only a single object name is allowed\n");
         printf("To see the options list: %s -h\n",
             glflags.program_name);
-        exit(FAILED);
+        makename_destructor();
+        global_destructors();
+        exit(EXIT_FAILURE);
     }
     if (dwoptind > (argc - 1)) {
         printf("No object file name provided to %s\n",
             glflags.program_name);
         printf("To see the options list: %s -h\n",
             glflags.program_name);
-        exit(FAILED);
+        makename_destructor();
+        global_destructors();
+        exit(EXIT_FAILURE);
     }
     /*  FIXME: it seems silly to be printing section names
         where the section does not exist in the object file.

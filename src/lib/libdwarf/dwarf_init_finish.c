@@ -53,9 +53,15 @@
 #ifdef HAVE_ZLIB_H
 #include "zlib.h"
 #endif
+#ifdef HAVE_ZSTD_H
+#include "zstd.h"
+#endif
 
 #ifndef ELFCOMPRESS_ZLIB
 #define ELFCOMPRESS_ZLIB 1
+#endif
+#ifndef ELFCOMPRESS_ZSTD
+#define ELFCOMPRESS_ZSTD 2
 #endif
 
 /*  If your mingw elf.h is missing SHT_RELA and you do not
@@ -1540,6 +1546,7 @@ dwarf_object_init_b(Dwarf_Obj_Access_Interface_a* obj,
 {
     Dwarf_Debug dbg = 0;
     int setup_result = DW_DLV_OK;
+    Dwarf_Unsigned filesize = 0;
 
     if (!ret_dbg) {
         DWARF_DBG_ERROR(NULL,DW_DLE_DWARF_INIT_DBG_NULL,
@@ -1548,9 +1555,12 @@ dwarf_object_init_b(Dwarf_Obj_Access_Interface_a* obj,
     /*  Non-null *ret_dbg will cause problems dealing with
         DW_DLV_ERROR */
     *ret_dbg = 0;
+    filesize = obj->ai_methods->om_get_filesize(obj->ai_object);
     /*  Initializes  Dwarf_Debug struct and returns
-        a pointer to that empty record. */
-    dbg = _dwarf_get_debug();
+        a pointer to that empty record.
+        Filesize is to set up a sensible default hash tree
+        size. */
+    dbg = _dwarf_get_debug(filesize);
     if (!dbg) {
         DWARF_DBG_ERROR(dbg, DW_DLE_DBG_ALLOC, DW_DLV_ERROR);
     }
@@ -1563,8 +1573,7 @@ dwarf_object_init_b(Dwarf_Obj_Access_Interface_a* obj,
     dbg->de_frame_undefined_value_number  = DW_FRAME_UNDEFINED_VAL;
 
     dbg->de_obj_file = obj;
-    dbg->de_filesize = obj->ai_methods->
-        om_get_filesize(obj->ai_object);
+    dbg->de_filesize = filesize;
     dbg->de_groupnumber = groupnumber;
     setup_result = _dwarf_setup(dbg, error);
     if (setup_result == DW_DLV_OK) {
@@ -1650,11 +1659,15 @@ dwarf_object_finish(Dwarf_Debug dbg)
 {
     int res = 0;
 
+    _dwarf_harmless_cleanout(&dbg->de_harmless_errors);
     res = _dwarf_free_all_of_one_debug(dbg);
+    /*  see dwarf_error.h dwarf_error.c  Relevant
+        to trying and failing to open/read corrupt
+        object files.  */
     return res;
 }
 
-#ifdef HAVE_ZLIB
+#if defined(HAVE_ZLIB) || defined(HAVE_ZSTD)
 /*  case 1:
     The input stream is assumed to contain
     the four letters
@@ -1664,42 +1677,47 @@ dwarf_object_finish(Dwarf_Debug dbg)
     a big-endian binary number.
     Following that is the stream to decompress.
 
-    case 2:
+    case 2,3:
     The section flag bit  SHF_COMPRESSED (1 << 11)
     must be set.
     we then do the equivalent of reading a
         Elf32_External_Chdr
     or
         Elf64_External_Chdr
-    to get the type (which must be 1)
+    to get the type (which must be 1 (zlib) or 2 (zstd))
     and the decompressed_length.
     Then what follows the implicit Chdr is decompressed.
+
     */
 
 /*  ALLOWED_ZLIB_INFLATION is a heuristic, not necessarily right.
     The test case klingler2/compresseddebug.amd64 actually
-    inflates about 8 times. */
+    inflates about 8 times.  */
 #define ALLOWED_ZLIB_INFLATION 16
+#define ALLOWED_ZSTD_INFLATION 16
 static int
-do_decompress_zlib(Dwarf_Debug dbg,
+do_decompress(Dwarf_Debug dbg,
     struct Dwarf_Section_s *section,
     Dwarf_Error * error)
 {
-    Bytef *basesrc = (Bytef *)section->dss_data;
-    Bytef *src = (Bytef *)basesrc;
-    uLong srclen = section->dss_size;
+    Dwarf_Small *basesrc = section->dss_data;
+    Dwarf_Small *src = basesrc;
+    Dwarf_Small *dest = 0;
+    Dwarf_Unsigned destlen = 0;
+    Dwarf_Unsigned srclen = section->dss_size;
     Dwarf_Unsigned flags = section->dss_flags;
     Dwarf_Small *endsection = 0;
-    int res = 0;
-    Bytef *dest = 0;
-    uLongf destlen = 0;
+    int zstdcompress = FALSE;
     Dwarf_Unsigned uncompressed_len = 0;
 
-    endsection = basesrc + srclen;
-    if ((src + 12) >endsection) {
-        DWARF_DBG_ERROR(dbg, DW_DLE_ZLIB_SECTION_SHORT, DW_DLV_ERROR);
+    endsection = basesrc + section->dss_size;
+    if ((basesrc + 12) > endsection) {
+        _dwarf_error_string(dbg, error,DW_DLE_ZLIB_SECTION_SHORT,
+            "DW_DLE_ZLIB_SECTION_SHORT"
+            "Section too short to be either zlib or zstd related");
+        return DW_DLV_ERROR;
     }
-    section->dss_compressed_length = section->dss_size;
+    section->dss_compressed_length = srclen;
     if (!strncmp("ZLIB",(const char *)src,4)) {
         unsigned i = 0;
         unsigned l = 8;
@@ -1730,9 +1748,27 @@ do_decompress_zlib(Dwarf_Debug dbg,
         ptr += fldsize;
         READ_UNALIGNED_CK(dbg,size,Dwarf_Unsigned,ptr,fldsize,
             error,endsection);
-        if (type != ELFCOMPRESS_ZLIB) {
-            DWARF_DBG_ERROR(dbg, DW_DLE_ZDEBUG_INPUT_FORMAT_ODD,
-                DW_DLV_ERROR);
+        switch(type) {
+        case ELFCOMPRESS_ZLIB:
+            break;
+        case ELFCOMPRESS_ZSTD:
+            zstdcompress = TRUE;
+            break;
+        default: {
+            char buf[100];
+            dwarfstring m;
+
+            dwarfstring_constructor_static(&m,buf,sizeof(buf));
+            dwarfstring_append_printf_u(&m,
+                "DW_DLE_ZDEBUG_INPUT_FORMAT_ODD"
+                " The SHF_COMPRESSED type field is 0x%x, neither"
+                " zlib (1) or zstd(2). Corrupt dwarf.", type);
+            _dwarf_error_string(dbg, error,
+                DW_DLE_ZDEBUG_INPUT_FORMAT_ODD,
+                dwarfstring_string(&m));
+            dwarfstring_destructor(&m);
+            return DW_DLV_ERROR;
+        }
         }
         uncompressed_len = size;
         section->dss_uncompressed_length = uncompressed_len;
@@ -1740,10 +1776,14 @@ do_decompress_zlib(Dwarf_Debug dbg,
         srclen -= structsize;
         section->dss_shf_compressed = TRUE;
     } else {
-        DWARF_DBG_ERROR(dbg, DW_DLE_ZDEBUG_INPUT_FORMAT_ODD,
-            DW_DLV_ERROR);
+        _dwarf_error_string(dbg, error,
+            DW_DLE_ZDEBUG_INPUT_FORMAT_ODD,
+            "DW_DLE_ZDEBUG_INPUT_FORMAT_ODD"
+            " The compressed section is not properly formatted");
+        return DW_DLV_ERROR;
     }
-    {
+#ifdef HAVE_ZLIB
+    if (!zstdcompress) {
         /*  According to zlib.net zlib essentially never expands
             the data when compressing.  There is no statement
             about  any effective limit in the compression factor
@@ -1758,41 +1798,150 @@ do_decompress_zlib(Dwarf_Debug dbg,
             if (uncompressed_len < (srclen/2)) {
                 /*  Violates the approximate invariant about
                     compression not actually inflating. */
-                DWARF_DBG_ERROR(dbg, DW_DLE_ZLIB_UNCOMPRESS_ERROR,
-                    DW_DLV_ERROR);
+                _dwarf_error_string(dbg, error,
+                    DW_DLE_ZLIB_UNCOMPRESS_ERROR,
+                    "DW_DLE_ZLIB_UNCOMPRESS_ERROR"
+                    " The zlib compressed section  is"
+                    "absurdly small. Corrupt dwarf");
+                return DW_DLV_ERROR;
             }
         }
         if (max_inflated_len < srclen) {
             /* The calculation overflowed. */
-            DWARF_DBG_ERROR(dbg, DW_DLE_ZLIB_UNCOMPRESS_ERROR,
-                DW_DLV_ERROR);
+            _dwarf_error_string(dbg, error,
+                DW_DLE_ZLIB_UNCOMPRESS_ERROR,
+                "DW_DLE_ZLIB_UNCOMPRESS_ERROR:"
+                " The zlib compressed section  is"
+                " absurdly large so arithmentic overflow."
+                " So corrupt dwarf");
+            return DW_DLV_ERROR;
         }
         if (uncompressed_len > max_inflated_len) {
-            DWARF_DBG_ERROR(dbg, DW_DLE_ZLIB_UNCOMPRESS_ERROR,
-                DW_DLV_ERROR);
+            _dwarf_error_string(dbg, error,
+                DW_DLE_ZLIB_UNCOMPRESS_ERROR,
+                "DW_DLE_ZLIB_UNCOMPRESS_ERROR"
+                " The zlib compressed section  is"
+                " absurdly large given the input section"
+                " length. So corrupt dwarf");
+            return DW_DLV_ERROR;
         }
     }
+#else /* !HAVE_ZLIB */
+    if (!zstdcompress) {
+        _dwarf_error_string(dbg, error,
+            DW_DLE_ZDEBUG_REQUIRES_ZLIB,
+            "DW_DLE_ZDEBUG_REQUIRES_ZLIB: "
+            " zlib is missing, cannot decomreess a zlib section");
+        return DW_DLV_ERROR;
+    }
+#endif /* HAVE_ZLIB */
+#ifdef HAVE_ZSTD
+    if (zstdcompress) {
+        /*  According to zlib.net zlib essentially never expands
+            the data when compressing.  There is no statement
+            about  any effective limit in the compression factor
+            though we, here, assume  such a limit to check
+            for sanity in the object file.
+            These tests are heuristics.  */
+        Dwarf_Unsigned max_inflated_len =
+            srclen*ALLOWED_ZSTD_INFLATION;
+
+        if (srclen > 50)  {
+            /*  If srclen not super tiny lets check the following. */
+            if (uncompressed_len < (srclen/2)) {
+                /*  Violates the approximate invariant about
+                    compression not actually inflating. */
+                _dwarf_error_string(dbg, error,
+                    DW_DLE_ZLIB_UNCOMPRESS_ERROR,
+                    "DW_DLE_ZLIB_UNCOMPRESS_ERROR"
+                    " The zstd compressed section  is"
+                    "absurdly small. Corrupt dwarf");
+                return DW_DLV_ERROR;
+            }
+        }
+        if (max_inflated_len < srclen) {
+            /* The calculation overflowed. */
+            _dwarf_error_string(dbg, error,
+                DW_DLE_ZLIB_UNCOMPRESS_ERROR,
+                "DW_DLE_ZLIB_UNCOMPRESS_ERROR"
+                " The zstd compressed section  is"
+                " absurdly large so arithmentic overflow."
+                " So corrupt dwarf");
+            return DW_DLV_ERROR;
+        }
+        if (uncompressed_len > max_inflated_len) {
+            _dwarf_error_string(dbg, error,
+                DW_DLE_ZLIB_UNCOMPRESS_ERROR,
+                "DW_DLE_ZLIB_UNCOMPRESS_ERROR"
+                " The zstd compressed section  is"
+                " absurdly large given the input section"
+                " length. So corrupt dwarf");
+            return DW_DLV_ERROR;
+        }
+    }
+#else /* !HAVE_ZSTD */
+    if (zstdcompress) {
+        _dwarf_error_string(dbg, error,
+            DW_DLE_ZDEBUG_REQUIRES_ZLIB,
+            "DW_DLE_ZDEBUG_REQUIRES_ZLIB: "
+            " zstd is missing, cannot decomreess a libzstd section");
+        return DW_DLV_ERROR;
+    }
+#endif /* HAVE_ZSTD */
     if ((src +srclen) > endsection) {
-        DWARF_DBG_ERROR(dbg, DW_DLE_ZLIB_SECTION_SHORT, DW_DLV_ERROR);
+        _dwarf_error_string(dbg, error,
+            DW_DLE_ZLIB_SECTION_SHORT,
+            "DW_DLE_ZDEBUG_ZLIB_SECTION_SHORT"
+            " The zstd or zlib compressed section  is"
+            " longer than the section"
+            " length. So corrupt dwarf");
+        return DW_DLV_ERROR;
     }
     destlen = uncompressed_len;
     dest = malloc(destlen);
     if (!dest) {
-        DWARF_DBG_ERROR(dbg, DW_DLE_ALLOC_FAIL, DW_DLV_ERROR);
+        _dwarf_error_string(dbg, error,
+            DW_DLE_ALLOC_FAIL,
+            "DW_DLE_ALLOC_FAIL"
+            " The zstd or zlib uncompressed space"
+            " malloc failed: out of memory");
+        return DW_DLV_ERROR;
     }
     /*  uncompress is a zlib function. */
-    res = uncompress(dest,&destlen,src,srclen);
-    if (res == Z_BUF_ERROR) {
-        free(dest);
-        DWARF_DBG_ERROR(dbg, DW_DLE_ZLIB_BUF_ERROR, DW_DLV_ERROR);
-    } else if (res == Z_MEM_ERROR) {
-        free(dest);
-        DWARF_DBG_ERROR(dbg, DW_DLE_ALLOC_FAIL, DW_DLV_ERROR);
-    } else if (res != Z_OK) {
-        free(dest);
-        /* Probably Z_DATA_ERROR. */
-        DWARF_DBG_ERROR(dbg, DW_DLE_ZLIB_DATA_ERROR, DW_DLV_ERROR);
+#ifdef HAVE_ZLIB
+    if (!zstdcompress) {
+        int res = 0;
+        uLongf dlen = destlen;
+
+        res = uncompress(dest,&dlen,src,srclen);
+        if (res == Z_BUF_ERROR) {
+            free(dest);
+            DWARF_DBG_ERROR(dbg, DW_DLE_ZLIB_BUF_ERROR, DW_DLV_ERROR);
+        } else if (res == Z_MEM_ERROR) {
+            free(dest);
+            DWARF_DBG_ERROR(dbg, DW_DLE_ALLOC_FAIL, DW_DLV_ERROR);
+        } else if (res != Z_OK) {
+            free(dest);
+            /* Probably Z_DATA_ERROR. */
+            DWARF_DBG_ERROR(dbg, DW_DLE_ZLIB_DATA_ERROR,
+                DW_DLV_ERROR);
+        }
     }
+#endif /* HAVE_ZLIB */
+#ifdef HAVE_ZSTD
+    if (zstdcompress) {
+        size_t zsize =
+            ZSTD_decompress(dest,destlen,src,srclen);
+        if (zsize != destlen) {
+            free(dest);
+            _dwarf_error_string(dbg, error,
+                DW_DLE_ZLIB_DATA_ERROR,
+                "DW_DLE_ZLIB_DATA_ERROR"
+                " The zstd ZSTD_decompress() failed.");
+            return DW_DLV_ERROR;
+        }
+    }
+#endif /* HAVE_ZSTD */
     /* Z_OK */
     section->dss_data = dest;
     section->dss_size = destlen;
@@ -1800,7 +1949,7 @@ do_decompress_zlib(Dwarf_Debug dbg,
     section->dss_did_decompress = TRUE;
     return DW_DLV_OK;
 }
-#endif /* HAVE_ZLIB */
+#endif /* HAVE_ZLIB || HAVE_ZSTD */
 
 /*  Load the ELF section with the specified index and set its
     dss_data pointer to the memory where it was loaded.  */
@@ -1868,16 +2017,20 @@ _dwarf_load_section(Dwarf_Debug dbg,
             DWARF_DBG_ERROR(dbg, DW_DLE_COMPRESSED_EMPTY_SECTION,
                 DW_DLV_ERROR);
         }
-#ifdef HAVE_ZLIB
-        res = do_decompress_zlib(dbg,section,error);
+#if defined(HAVE_ZLIB) || defined(HAVE_ZSTD)
+        res = do_decompress(dbg,section,error);
         if (res != DW_DLV_OK) {
             return res;
         }
-        section->dss_did_decompress = TRUE;
 #else
-        DWARF_DBG_ERROR(dbg,DW_DLE_ZDEBUG_REQUIRES_ZLIB,
-            DW_DLV_ERROR);
+        _dwarf_error_string(dbg, error,
+            DW_DLE_ZDEBUG_REQUIRES_ZLIB,
+            "DW_DLE_ZDEBUG_REQUIRES_ZLIB: "
+            " zlib and zstd are missing, cannot"
+            " decompress section.");
+        return DW_DLV_ERROR;
 #endif
+        section->dss_did_decompress = TRUE;
     }
     if (_dwarf_apply_relocs == 0) {
         return res;

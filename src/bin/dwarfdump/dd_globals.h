@@ -117,6 +117,7 @@ extern void print_error_and_continue (Dwarf_Debug dbg,
 extern void print_error (Dwarf_Debug dbg, const char * msg,
     int res, Dwarf_Error err);
 
+
 extern int print_line_numbers_this_cu (Dwarf_Debug dbg,
     Dwarf_Die in_die,
     char **srcfiles,
@@ -145,6 +146,7 @@ extern int print_types(Dwarf_Debug dbg,enum type_type_e type_type,
 extern int print_weaknames(Dwarf_Debug dbg, Dwarf_Error *);
 extern int print_debug_names(Dwarf_Debug dbg,Dwarf_Error *);
 int print_debug_sup(Dwarf_Debug dbg, Dwarf_Error *error);
+extern int print_debug_addr(Dwarf_Debug dbg, Dwarf_Error *error);
 int print_all_abbrevs_for_cu(Dwarf_Debug dbg,
     Dwarf_Unsigned  offset,
     Dwarf_Unsigned abbrev_num_in,
@@ -224,6 +226,7 @@ extern int print_macinfo_by_offset(Dwarf_Debug dbg,
     Dwarf_Die cudie,Dwarf_Unsigned offset,Dwarf_Error *);
 
 void ranges_esb_string_destructor(void);
+void global_destructors(void);
 void destruct_abbrev_array(void);
 
 int get_proc_name_by_die(Dwarf_Debug dbg,

@@ -31,12 +31,16 @@ Portions Copyright (C) 2013-2018 David Anderson. All Rights Reserved.
 
 */
 
-#include "config.h"
-#include <stdlib.h>
-#include <string.h>
+#include <config.h>
+
+#include <stdlib.h> /* exit() */
+#include <string.h> /* strcmp() */
+
 #include "libdwarf_private.h"
 #include "dd_esb.h"
-#define TRUE 1
+#include "dd_minimal.h"
+
+void dd_minimal_count_global_error(void) {}
 
 static int failcount = 0;
 
@@ -63,14 +67,14 @@ validate_esb(int instance,
     }
 }
 
-int main(int argc, char *argv[])
+int main(void)
 {
 #ifdef _WIN32
     /* Open the null device used during formatting printing */
     if (!esb_open_null_device())
     {
         fprintf(stderr, "esb: Unable to open null device.\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 #endif /* _WIN32 */
     {   /*  First lets establish standard sprintf on
@@ -222,6 +226,8 @@ int main(int argc, char *argv[])
         validate_esb(16,&e,23,24,"abcde fghij klmno pqrst",__LINE__);
         esb_destructor(&d);
         esb_destructor(&e);
+        /*  esb_get_copy returns malloc-d bytes. Must free. */
+        free(result);
     }
     {
         struct esb_s d5;
@@ -396,11 +402,8 @@ int main(int argc, char *argv[])
 #endif /* _WIN32 */
     if (failcount) {
         printf("FAIL esb test\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     printf("PASS esb test\n");
     exit(0);
-
-    (void)argc;
-    (void)argv;
 }

@@ -219,13 +219,27 @@ add_def_undef(unsigned opnum,
     macdef_entry *meb = 0;
     char * keystr = 0;
     int isdef = FALSE;
+    int allocerror = FALSE;
 
     if (!strcmp(esb_get_string(mtext),nonameavail)) {
         /*  we have no string, just the fake we provide.
             hard to check much in this case. */
         return;
     }
+    /*  Have to strdup here as find_set_keyend
+        modifies what it is passed. */
     keystr = strdup((const char *)macro_string);
+    if (!keystr) {
+        if (!allocerror) {
+            glflags.gf_count_major_errors++;
+            printf("ERROR: Macro define/undef "
+                "macro op string strdup() fails, "
+                "Out of memory. Some dwarfdump"
+                "reporting will be incorrect.\n");
+            allocerror = TRUE;
+        }
+        return;
+    }
     key_length = find_set_keyend(keystr);
     if (!key_length) {
         if (!didprintdwarf) {
@@ -1329,6 +1343,8 @@ print_macros_5style_this_cu_inner(Dwarf_Debug dbg, Dwarf_Die cu_die,
         DWARF_CHECK_COUNT(lines_result,1);
         dwarf_check_lineheader(cu_die,&line_errs);
         if (line_errs > 0) {
+            /* does glflags.check_error++; */
+            /* sets glflags.gf_record_dwarf_error = TRUE; */
             DWARF_CHECK_ERROR_PRINT_CU();
             DWARF_ERROR_COUNT(lines_result,line_errs);
             DWARF_CHECK_COUNT(lines_result,(line_errs-1));
@@ -1445,9 +1461,9 @@ macdef_tree_create_entry(char *key,
     const char * string)
 {
     char *keyspace = 0;
-    unsigned klen = strlen(key) +1;
-    unsigned slen = strlen(string) +1;
-    unsigned finallen = sizeof(macdef_entry) + klen + slen;
+    size_t klen = strlen(key) +1;
+    size_t slen = strlen(string) +1;
+    size_t finallen = sizeof(macdef_entry) + klen + slen;
     macdef_entry *me =
         (macdef_entry*)calloc(1,finallen);
     if (!me) {

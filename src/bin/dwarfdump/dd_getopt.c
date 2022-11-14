@@ -52,8 +52,9 @@
 #include <config.h>
 
 #include <stddef.h> /* NULL size_t */
-#include <stdio.h>  /* fprintf() */
+#include <stdio.h>  /* printf() */
 #include <string.h> /* strlen() strchr() strcmp() strncmp() */
+#include "dd_minimal.h" /* dd_minimal_count_global_error */
 
 #include "dd_getopt.h"
 
@@ -100,7 +101,7 @@ dwoptnamematches(
 
     const char *eq = 0;
     unsigned namelen = 0;
-    unsigned arglen = 0;
+    size_t arglenszt = 0;
     int d = 0;
 
     for (eq = iplace; *eq; ++eq) {
@@ -113,7 +114,7 @@ dwoptnamematches(
             return FALSE;
         }
         eq++;
-        arglen = strlen(eq);
+        arglenszt = strlen(eq);
         break;
     }
     if (namelen) {
@@ -125,7 +126,7 @@ dwoptnamematches(
             *argerr = TRUE;
             return TRUE;
         }
-        if (arglen) {
+        if (arglenszt) {
             /*  Discarding const, avoiding warning.
                 Data is in user space, so this is ok. */
             dwoptarg = (char *)eq;
@@ -204,11 +205,10 @@ int dwgetopt_long(int nargc, char *const nargv[],
 
         if (!dwlopt->name) {
             dwoptind++;
-            (void)fprintf(stderr,
-                "%s: invalid long option '--%s'\n",
-                nargv[0]?nargv[0]:"",
-                place);
+            (void)printf("ERROR:"
+                " invalid long option '--%s'\n", place);
             /* Leave longindex unchanged. */
+            dd_minimal_count_global_error();
             place = EMSG;
             return (BADCH);
         }
@@ -242,17 +242,16 @@ int dwgetopt_long(int nargc, char *const nargv[],
                     match GNU getopt_long behavior
                     of taking next argv as the arg value.
                     and thus making getopt_long succeed. */
-                (void)fprintf(stderr,
-                    "%s: missing required long option "
-                    "argument '--%s'\n",
-                    nargv[0]?nargv[0]:"",
-                    place);
+                (void)printf("ERROR:"
+                    " missing required long option "
+                    "argument '--%s'\n", place);
+                dd_minimal_count_global_error();
             } else {
                 /* has arg but should not */
-                (void)fprintf(stderr,
-                    "%s: option '--%s' does not allow an argument\n",
-                    nargv[0]?nargv[0]:"",
+                (void)printf("ERROR:"
+                    " option '--%s' does not allow an argument\n",
                     dwlopt->name);
+                dd_minimal_count_global_error();
             }
             dwoptind++;
             place = EMSG;
@@ -324,10 +323,9 @@ dwgetopt(int nargc, char * const nargv[], const char *ostr)
             ++dwoptind;
         }
         if (dwopterr && *ostr != ':') {
-            (void)fprintf(stderr,
-                "%s: invalid option -- '%c'\n",
-                nargv[0]?nargv[0]:"",
-                dwoptopt);
+            (void)printf("ERROR:"
+                " invalid option -- '%c'\n", dwoptopt);
+            dd_minimal_count_global_error();
         }
         return (BADCH);
     }
@@ -362,10 +360,10 @@ dwgetopt(int nargc, char * const nargv[], const char *ostr)
                     return (BADARG);
                 }
                 if (dwopterr) {
-                    (void)fprintf(stderr,
-                        "%s: option requires an argument. -- '%c'\n",
-                        nargv[0]?nargv[0]:"",
+                    (void)printf("ERROR:"
+                        " option requires an argument. -- '%c'\n",
                         dwoptopt);
+                    dd_minimal_count_global_error();
                 }
                 return (BADCH);
             }

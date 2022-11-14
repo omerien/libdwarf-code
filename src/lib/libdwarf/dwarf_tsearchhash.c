@@ -78,12 +78,16 @@ static unsigned long primes[] =
 {
 #if 0 /* for testing only */
 5,11, 17,23, 31, 47, 53,
-#endif /*0*/
 79,
+#endif /*0*/
 1009,
+#if 0
 5591,
+#endif
 10007,
+#if 0
 21839,
+#endif
 41413,
 99907,
 199967,
@@ -143,8 +147,7 @@ tsearch_inner( const void *key, struct hs_base* head,
     struct ts_entry **parent_ptr);
 static void
 dwarf_tdestroy_inner(struct hs_base*h,
-    void (*free_node)(void *nodep),
-    int depth);
+    void (*free_node)(void *nodep));
 
 /*  A trivial integer-based percentage calculation.
     Percents >100 are reasonable for a hash-with-chains
@@ -203,6 +206,10 @@ dwarf_initialize_search_hash( void **treeptr,
         }
         entry_index = k;
     }
+#if 0
+printf("dadebug initial alloc size estimate %lu\n",size_estimate);
+printf("dadebug initial alloc prime to use %lu\n",prime_to_use);
+#endif
     base->tablesize_ = prime_to_use;
     base->allowed_fill_ = calculate_allowed_fill(allowed_fill_percent,
         prime_to_use);
@@ -374,6 +381,9 @@ resize_table(struct hs_base *head,
         unsigned long ix = 0;
         unsigned long tsize = head->tablesize_;
         struct ts_entry *p = &head->hashtab_[0];
+#if 0
+printf("dadebug Resize %lu to %lu\n",tsize,prime_to_use);
+#endif
         for ( ; ix < tsize; ix++,p++) {
             int inserted = 0;
             struct ts_entry*n = 0;
@@ -410,7 +420,7 @@ resize_table(struct hs_base *head,
         }
     }
     /* Now get rid of the chain entries of the old table. */
-    dwarf_tdestroy_inner(head,0,0);
+    dwarf_tdestroy_inner(head,0);
     /* Now get rid of the old table itself. */
     free(head->hashtab_);
     head->hashtab_ = 0;
@@ -466,7 +476,7 @@ tsearch_inner( const void *key, struct hs_base* head,
     kc = compar(key,s->keyptr);
     if (kc == 0 ) {
         /* found! */
-        if (want_delete) {
+        if (intent == want_delete) {
             *owner_ptr = 0;
         }
         return (void *)&(s->keyptr);
@@ -476,7 +486,7 @@ tsearch_inner( const void *key, struct hs_base* head,
         kc = compar(key,c->keyptr);
         if (kc == 0 ) {
             /* found! */
-            if (want_delete) {
+            if (intent == want_delete) {
                 *owner_ptr = chain_parent;
             }
             return (void *)&(c->keyptr);
@@ -608,18 +618,19 @@ static void
 dwarf_twalk_inner(const struct hs_base *h,
     struct ts_entry *p,
     void (*action)(const void *nodep, const DW_VISIT which,
-        const int depth UNUSEDARG),
-    unsigned level UNUSEDARG)
+        const int depth )
+    )
 {
     unsigned long ix = 0;
+    int depth = 0;
     unsigned long tsize = h->tablesize_;
     for ( ; ix < tsize; ix++,p++) {
         struct ts_entry*n = 0;
         if (p->keyptr) {
-            action((void *)(&(p->keyptr)),dwarf_leaf,level);
+            action((void *)(&(p->keyptr)),dwarf_leaf,depth);
         }
         for (n = p->next; n ; n = n->next) {
-            action((void *)(&(n->keyptr)),dwarf_leaf,level);
+            action((void *)(&(n->keyptr)),dwarf_leaf,depth);
         }
     }
 }
@@ -627,7 +638,7 @@ dwarf_twalk_inner(const struct hs_base *h,
 void
 dwarf_twalk(const void *rootp,
     void (*action)(const void *nodep, const DW_VISIT which,
-        const int depth UNUSEDARG))
+        const int depth))
 {
     const struct hs_base *head = (const struct hs_base *)rootp;
     struct ts_entry *root = 0;
@@ -636,13 +647,12 @@ dwarf_twalk(const void *rootp,
     }
     root = head->hashtab_;
     /* Get to actual tree. */
-    dwarf_twalk_inner(head,root,action,0);
+    dwarf_twalk_inner(head,root,action);
 }
 
 static void
 dwarf_tdestroy_inner(struct hs_base*h,
-    void (*free_node)(void *nodep),
-    int depth UNUSEDARG)
+    void (*free_node)(void *nodep))
 {
     unsigned long ix = 0;
     unsigned long tsize = h->tablesize_;
@@ -685,7 +695,7 @@ dwarf_tdestroy(void *rootp, void (*free_node)(void *nodep))
         return;
     }
     root = head->hashtab_;
-    dwarf_tdestroy_inner(head,free_node,0);
+    dwarf_tdestroy_inner(head,free_node);
     free(root);
     free(head);
 }

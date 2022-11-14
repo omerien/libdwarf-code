@@ -108,6 +108,22 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MH_CIGAM_64 0xcffaedfe
 #endif /*  MH_MAGIC_64 */
 
+/* A flag not public to users. */
+static int _dwarf_global_debuglink_crc_suppress;
+
+int
+dwarf_suppress_debuglink_crc(int dw_suppress)
+{
+    int old = _dwarf_global_debuglink_crc_suppress;
+    _dwarf_global_debuglink_crc_suppress = dw_suppress;
+    return old;
+}
+
+int _dwarf_get_suppress_debuglink_crc(void)
+{
+    return _dwarf_global_debuglink_crc_suppress;
+}
+
 static unsigned long
 magic_copy(unsigned char *d, unsigned len)
 {
@@ -535,7 +551,7 @@ dwarf_object_detector_path_dSYM(
 
     if (have_outpath) {
         /*   Looking for MacOS dSYM */
-        if ((2*plen + dsprefixlen +2) >= outpath_len) {
+        if ((2*plen + dsprefixlen +2) >= (size_t)outpath_len) {
             *errcode =  DW_DLE_PATH_SIZE_TOO_SMALL;
             return DW_DLV_ERROR;
         }
@@ -604,17 +620,19 @@ match_buildid(
     unsigned        buildid_length_debug,
     unsigned  char *buildid_debug)
 {
-    if (crc_debug && crc_base) {
+    if (!_dwarf_get_suppress_debuglink_crc() && \
+        crc_debug && crc_base) {
         /* crc available for both */
         if (!blockmatch(crc_debug,crc_base,4)) {
             return FALSE;
         }
-    }
-    if (buildid_length_base != buildid_length_debug) {
-        return FALSE;
+        return TRUE;
     }
     if (!blockmatch(buildid_base,buildid_debug,
         buildid_length_base)) {
+        return FALSE;
+    }
+    if (buildid_length_base != buildid_length_debug) {
         return FALSE;
     }
     return TRUE;
@@ -683,8 +701,9 @@ _dwarf_debuglink_finder_newpath(
     paths = 0;
 
     memset(&lcrc[0],0,sizeof(lcrc));
-    if (crc_in && !crc) {
+    if (!_dwarf_get_suppress_debuglink_crc() &&crc_in && !crc) {
         int res1 = 0;
+
         res1 = dwarf_crc32(dbg,lcrc,&error);
         if (res1 == DW_DLV_ERROR) {
             paths = 0;
@@ -798,7 +817,7 @@ _dwarf_debuglink_finder_internal(
         return DW_DLV_NO_ENTRY;
     }
     if (res == DW_DLV_NO_ENTRY) {
-        /*  There is no debuglink section */
+        /*  There is no debuglink buildid   section? */
         dwarf_finish(dbg);
         return DW_DLV_NO_ENTRY;
     }
@@ -865,7 +884,7 @@ dwarf_object_detector_path_b(
         /*  On return from the following call  we could well
             close the fd above and open a new one. */
         int debuglink_fd = -1;
-        unsigned long dllen = 0;
+        size_t dllenszt = 0;
         char *cp = 0;
         dwarfstring m;
 
@@ -891,10 +910,10 @@ dwarf_object_detector_path_b(
         } else {
             if (debuglink_fd != -1) {
                 close(debuglink_fd);
+                debuglink_fd = -1;
             }
-            dllen = dwarfstring_strlen(&m)+1;
-            if (dllen >= outpath_len) {
-                close(debuglink_fd);
+            dllenszt = dwarfstring_strlen(&m)+1;
+            if (dllenszt >= (size_t)outpath_len) {
                 *errcode = DW_DLE_DEBUGLINK_PATH_SHORT;
                 return DW_DLV_ERROR;
             }

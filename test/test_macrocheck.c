@@ -26,6 +26,9 @@
 */
 
 #include "dd_macrocheck.c"
+#include "dd_minimal.h"
+
+void dd_minimal_count_global_error(void) {}
 
 int
 main(void)
@@ -108,7 +111,7 @@ main(void)
     }
     if (failcount > 0) {
         printf("FAIL macrocheck selftest\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     printf("PASS macrocheck selftest\n");
     return 0;

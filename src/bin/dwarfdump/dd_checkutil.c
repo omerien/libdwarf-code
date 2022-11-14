@@ -59,7 +59,7 @@ Portions Copyright (C) 2011-2019 David Anderson. All Rights Reserved.
 
 /* Private function */
 static void DumpFullBucketGroup(Bucket_Group *pBucketGroup);
-static int FindDataIndexInBucket(Bucket_Group *pBucketGroup,
+static Dwarf_Signed FindDataIndexInBucket(Bucket_Group *pBucketGroup,
     Bucket_Data *pBucketData);
 static void PrintBucketData(Bucket_Group *pBucketGroup,
     Bucket_Data *pBucketData);
@@ -72,6 +72,9 @@ AllocateBucketGroup(int kind)
 {
     Bucket_Group *pBucketGroup = (Bucket_Group *)calloc(1,
         sizeof(Bucket_Group));
+    if (!pBucketGroup) {
+        return NULL;
+    }
     pBucketGroup->kind = kind;
     return pBucketGroup;
 }
@@ -134,13 +137,16 @@ void PrintBucketGroup(Bucket_Group *pBucketGroup,Dwarf_Bool bFull)
 static void
 PrintBucketData(Bucket_Group *pBucketGroup,Bucket_Data *pBucketData)
 {
-    int nCount = 0;
+    Dwarf_Signed nCount = 0;
     assert(pBucketGroup);
     assert(pBucketData);
 
     nCount = FindDataIndexInBucket(pBucketGroup,pBucketData);
-    printf("[%06d] Key = 0x%08" DW_PR_DUx ", Base = 0x%08" DW_PR_DUx
-        ", Low = 0x%08" DW_PR_DUx ", High = 0x%08" DW_PR_DUx
+    printf("[%06" DW_PR_DSd
+        "] Key = 0x%08" DW_PR_DUx
+        ", Base = 0x%08" DW_PR_DUx
+        ", Low = 0x%08" DW_PR_DUx
+        ", High = 0x%08" DW_PR_DUx
         ", Flag = %d, Name = '%s'\n",
         ++nCount,
         pBucketData->key,
@@ -213,6 +219,9 @@ AddEntryIntoBucketGroup(Bucket_Group *pBucketGroup,
     if (!pBucketGroup->pHead) {
         /* Allocate first bucket */
         pBucket = (Bucket *)calloc(1,sizeof(Bucket));
+        if (!pBucket) {
+            return;
+        }
         pBucketGroup->pHead = pBucket;
         pBucketGroup->pTail = pBucket;
         pBucket->nEntries = 1;
@@ -229,6 +238,9 @@ AddEntryIntoBucketGroup(Bucket_Group *pBucketGroup,
         } else {
             /* Allocate new bucket */
             pBucket = (Bucket *)calloc(1,sizeof(Bucket));
+            if (!pBucket) {
+                return;
+            }
             pBucketGroup->pTail->pNext = pBucket;
             pBucketGroup->pTail = pBucket;
             pBucket->nEntries = 1;
@@ -358,8 +370,8 @@ Bucket_Data *FindDataInBucketGroup(Bucket_Group *pBucketGroup,
 }
 
 /*  Find the Bucket that contains a given Bucket Data
-    and return its local index. Else return -1.  */
-static int
+    and return its index or -1 if none such. */
+static Dwarf_Signed
 FindDataIndexInBucket(Bucket_Group *pBucketGroup,
     Bucket_Data *pBucketData)
 {
@@ -388,7 +400,8 @@ FindDataIndexInBucket(Bucket_Group *pBucketGroup,
             if (pBucketGroup->pFirst >= pLower &&
                 pBucketGroup->pFirst <= pUpper) {
                 /* We have found the bucket, return the index. */
-                return pBucketData - pBucketGroup->pFirst;
+                return (Dwarf_Signed)
+                    (pBucketData - pBucketGroup->pFirst);
             }
         }
     } else {
@@ -403,12 +416,12 @@ FindDataIndexInBucket(Bucket_Group *pBucketGroup,
             /* Check if the first sentinel is in this bucket */
             if (pBucketData >= pLower && pBucketData <= pUpper) {
                 /* We have found the bucket, return the index */
-                return pBucketData - pLower;
+                return (Dwarf_Signed)(pBucketData - pLower);
             }
         }
     }
     /* Invalid data; just return index indicating not-found */
-    return -1;
+    return (Dwarf_Signed)-1;
 }
 
 /*  Search an entry (Bucket Data) in the Bucket Group.
@@ -523,16 +536,18 @@ ProcessBucketGroup(Bucket_Group *pBucketGroup,
     void (*pFunction)(Bucket_Group *pBucketGroup,
         Bucket_Data *pBucketData))
 {
-    int nIndex = 0;
-    int nStart = 0;
-    Bucket *pBucket = 0;
+    Dwarf_Signed nIndex = 0;
+    Dwarf_Signed nStart = 0;
+    Bucket      *pBucket = 0;
     Bucket_Data *pBucketData = 0;
     Bucket_Data *pLower = 0;
     Bucket_Data *pUpper = 0;
-    Dwarf_Bool bFound = FALSE;
+    Dwarf_Bool   bFound = FALSE;
 
     /* Sanity checks */
-    assert(pBucketGroup);
+    if (!pBucketGroup) {
+        return;
+    }
 
     /* No sentinels present; do nothing */
     if (!pBucketGroup->pFirst || !pBucketGroup->pLast) {
@@ -560,8 +575,12 @@ ProcessBucketGroup(Bucket_Group *pBucketGroup,
         return;
     }
 
-    /* Calculate index for first sentinel */
+    /*  Calculate index for first sentinel
+        ASSERT: nStart >= 0 */
     nStart = pBucketGroup->pFirst - pLower;
+    if (nStart < 0) {
+        return; /* Impossible. */
+    }
 
     /* Start traversing from found bucket */
     for (; pBucket && pBucket->nEntries; pBucket = pBucket->pNext) {

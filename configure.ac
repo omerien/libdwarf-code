@@ -3,7 +3,7 @@
 
 dnl defines the version name of  the libdwarf.so
 m4_define([v_maj], [0])
-m4_define([v_min], [4])
+m4_define([v_min], [5])
 m4_define([v_mic], [0])
 m4_define([v_ver], [v_maj.v_min.v_mic])
 
@@ -22,6 +22,9 @@ AC_INIT([libdwarf], [v_ver], [libdwarf-list -at- linuxmail -dot- org])
 AC_CONFIG_SRCDIR([configure.ac])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIRS([m4])
+
+### not yet, will be used before long.
+###AM_PATH_PYTHON([3.0])
 
 ### Additional options to configure
 
@@ -102,9 +105,8 @@ case "$host_os" in
       have_win32="yes"
    ;;
 esac
-
-AM_CONDITIONAL([HAVE_WIN32], [test "x${have_win32}" = "xyes"])
-
+### supress debuglink tests if windows.
+AM_CONDITIONAL([HAVE_DEBUGLINK], [test "x${have_win32}" = "xno"])
 
 ### Checks for programs
 
@@ -112,7 +114,7 @@ AM_PROG_AR
 
 ### We don't use dist-xz *.xz output from make dist,
 ### so don't mention it.
-AM_INIT_AUTOMAKE([1.6 dist-xz])
+AM_INIT_AUTOMAKE([1.6 dist-xz subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AS_IF(
@@ -164,6 +166,16 @@ PKG_CHECK_MODULES([ZLIB], [zlib],
      have_zlib="no"
      have_pc_zlib="no"
     ])
+PKG_CHECK_MODULES([ZSTD], [zstd],
+    [
+     have_zstd="yes"
+     have_pc_zstd="yes"
+     requirements_libdwarf_pc="${requirements_libdwarf_pc} zstd"
+    ],
+    [
+     have_zstd="no"
+     have_pc_zstd="no"
+    ])
 
 AC_SUBST([requirements_libdwarf_pc])
 
@@ -175,8 +187,8 @@ AC_ARG_VAR([DWARF_LIBS], [extra linker flags when linking dwarfdump])
 ### Checks for header files
 
 ### MacOS does not have malloc.h
-AC_CHECK_HEADERS([unistd.h sys/types.h regex.h malloc.h])
-### for uintptr_t
+AC_CHECK_HEADERS([unistd.h sys/types.h malloc.h])
+### for uintptr_t and open and open argument defines
 AC_CHECK_HEADERS([stdint.h inttypes.h stddef.h fcntl.h])
 
 AS_IF(
@@ -184,6 +196,11 @@ AS_IF(
     [AC_CHECK_HEADERS([zlib.h],
         [have_zlib="yes"],
         [have_zlib="no"])])
+AS_IF(
+    [test "x${have_zstd}" = "xno"],
+    [AC_CHECK_HEADERS([zstd.h],
+        [have_zstd="yes"],
+        [have_zstd="no"])])
 
 ### for use in casts to uint to avoid 32bit warnings.
 ### Also needed by C++ cstdint
@@ -356,16 +373,30 @@ LIBS=${LIBS_save}
 
 requirements_libdwarf_libs=
 AS_IF(
+    echo "dadebug zlib ${have_pc_zlib} ${have_zlib}"
     [test "x${have_pc_zlib}" = "xno"  -a "x${have_zlib}" = "xyes"],
     [AC_SEARCH_LIBS(
         [uncompress], [z],
         [
          ZLIB_LIBS="-lz"
          requirements_libdwarf_libs="-lz"
+         echo "dadebug req set lz"
         ],
         [have_zlib="no"])
     ])
-AC_SUBST([requirements_libdwarf_libs])
+AS_IF(
+    echo "dadebug zstd ${have_pc_zstd} ${have_zstd}"
+    [test "x${have_pc_zstd}" = "xno"  -a "x${have_zstd}" = "xyes"],
+    [AC_SEARCH_LIBS(
+        [ZSTD_decompress], [zstd],
+        [
+         ZSTD_LIBS="-lzstd"
+         echo "dadebug req set zstd"
+         requirements_libdwarf_libs="${requirements_libdwarf_libs} -lzstd"
+        ],
+        [have_zstd="no"])
+    ])
+
 
 AS_IF(
     [test "x${have_zlib}" = "xyes"],
@@ -373,6 +404,14 @@ AS_IF(
      AC_DEFINE([HAVE_ZLIB], [1], [Set to 1 if zlib decompression is available.])
      AC_DEFINE([HAVE_ZLIB_H], [1], [Set to 1 if zlib.h header file is available.])
     ])
+
+AS_IF(
+    [test "x${have_zstd}" = "xyes"],
+    [
+     AC_DEFINE([HAVE_ZSTD], [1], [Set to 1 if zstd decompression is available.])
+     AC_DEFINE([HAVE_ZSTD_H], [1], [Set to 1 if zstd.h header file is available.])
+    ])
+AC_SUBST([requirements_libdwarf_libs])
 
 ### Checks for system services
 
@@ -409,6 +448,7 @@ echo "  shared library.......: ${enable_shared}"
 echo "  static library.......: ${enable_static}"
 echo
 echo "  zlib support.........: ${have_zlib}"
+echo "  zstd support.........: ${have_zstd}"
 echo "  sanitize support.....: ${enable_sanitize}"
 echo "  documentation........: ${enable_doc}"
 echo "  BuildOS-BigEndian....: ${ac_cv_c_bigendian}"
@@ -427,6 +467,7 @@ echo "  CFLAGS...............: $CFLAGS ${c_compiler_flags}"
 echo "  LDFLAGS..............: $LDFLAGS"
 echo "  LIBS.................: $LIBS"
 echo "  ZLIB_LIBS............: $ZLIB_LIBS"
+echo "  ZSTD_LIBS............: $ZSTD_LIBS"
 echo "  DWARF_CFLAGS.........: $DWARF_CFLAGS"
 echo "  DWARF_LIBS...........: $DWARF_LIBS"
 echo "  DWARFGEN_LIBS........: $DWARFGEN_LIBS"

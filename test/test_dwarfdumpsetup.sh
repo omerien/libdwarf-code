@@ -12,18 +12,35 @@
 # as in this case we are running the script outside
 # of the source tree.
 #
+# This works for cmake,configure, not meson
 top_blddir=`pwd`/..
 
-if [ x$DWTOPSRCDIR = "x" ]
+if [ $# -gt 0 ]
 then
-  # Running in the source tree
-  top_srcdir=$top_blddir
+  top_srcdir="$1"
+  if [ $# -gt 1 ]
+  then
+    x="$2"
+    if [ "$x" = "ninja" ]
+    then
+      #  For meson only. build run in base build, not test/
+      top_blddir=`pwd`
+      echo "For ninja set top blddir $top_blddir"
+    else
+      ignore, we leav top_blddir as above.
+    fi
+  fi
 else
-  # Running outside the source tree (the normal case)
-  top_srcdir=$DWTOPSRCDIR
+  if [ x$DWTOPSRCDIR = "x" ]
+  then
+    # Running in the source tree
+      top_srcdir=$top_blddir
+  else
+    # Running outside the source tree (the normal case)
+    top_srcdir=$DWTOPSRCDIR
+  fi
 fi
 srcdir=$top_srcdir/test
-
 echo "TOP topsrc $top_srcdir topbld $top_blddir localsrc $srcdir"
 chkres() {
 r=$1
@@ -34,35 +51,17 @@ then
 fi
 }
 
-# So let dwarfdump emit more then trim.
 # In addition the zero date for file time in line tables
 # prints differently for different time zones.
-# Delete what follows 'last time 0x0'
-if [ x$win = "xy" ]
-then
-  textlim=702
-else
-  textlim=700
-fi
+textlim=700
 cp "$top_srcdir/src/bin/dwarfdump/dwarfdump.conf" .
 dd=$top_blddir/src/bin/dwarfdump/dwarfdump
-# Remove the leading two lines for windows
-# as windows dwarfdump emits two leading lines
-# as compared to non-windows dwarfdump
-droptwoifwin() {
-i=$1
-t=$2
-l=`wc -l < $i`
-if [ $l -gt 2 ]
-then
-  l=`expr $l - 2`
-  tail -$l <$i >$t
-  mv $t $i
-fi
-}
+
+# Delete what follows 'last time 0x0'
 fixlasttime() {
   i=$1
   t=$2
+  echo "Fix Last Time to 0, mv $t $i"
   sed 's/last time 0x.*/last time 0x0/' <$i >$t
   mv $t $i
 }

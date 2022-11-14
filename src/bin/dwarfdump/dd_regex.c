@@ -602,7 +602,7 @@ dd_pmatch(const char *lp, CHAR *ap,char **end_ptr,
                 n = CHRSKIP;
                 break;
             case CCL:
-                while ((c = *lp) && isinset(ap+1,c)) {
+                for (c = *lp ; c && isinset(ap+1,c); c = *lp) {
                     lp++;
                 }
                 n = CCLSKIP;
@@ -710,7 +710,7 @@ nfadump(CHAR *ap)
             break;
         default:
             printf("bad nfa. opcode %o\n", ap[-1]);
-            exit(1);
+            exit(EXIT_FAILURE);
             break;
         }
 }

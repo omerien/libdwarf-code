@@ -45,6 +45,7 @@
 #include "dd_globals.h"
 #include "dd_addrmap.h"
 #include "dd_tsearchbal.h"
+#include "libdwarf_private.h" /* For malloc/calloc debug */
 
 static struct Addr_Map_Entry *
 addr_map_create_entry(Dwarf_Unsigned k,char *name)
@@ -57,6 +58,7 @@ addr_map_create_entry(Dwarf_Unsigned k,char *name)
     }
     mp->mp_key = k;
     if (name) {
+        /* Might be zero if malloc fails. Ok. */
         mp->mp_name = (char *)strdup(name);
     } else {
         mp->mp_name = 0;

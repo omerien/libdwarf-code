@@ -1,4 +1,93 @@
 
+
+
+id: DW202208-001
+cve:
+fuzzer: unspecified
+datereported: 2022-08-27
+reportedby: Han Zheng
+vulnerability: Double free on corrupted frame data.
+product: libdwarf
+description: A carefully corrupted object file
+  would cause libdwarf to do a double free in
+  handling an error condition in
+  dwarf_expand_frame_instructions().
+  (in libdwarf/dwarf_frame.c)
+  That could cause a segmentation violation or other
+  major error, terminating the calling application and
+  resulting in Denial Of Service.
+datefixed: 2022-08-27
+references: regressiontests/hanzheng/fuzzedobject
+gitfixid: 428235e3d132fb62faf7732735fdbb034d6264b4
+tarrelease:
+endrec: DW202208-001
+
+
+
+
+
+id: DW202207-001
+cve:
+fuzzer: ossfuzz
+datereported: 2022-05-01
+reportedby: David Korczynski
+vulnerability: buffer overflow in dwarf_form.c
+product: libdwarf
+description: A carefully corrupted string
+  would cause libdwarf to read outside of a buffer containing
+  the string (one past the end) when checking the string
+  to determine if it is a full path in processing 
+  a .gnu.debuglink section.
+  That could cause a segmentation violation or other
+  major error, terminating the calling application and
+  resulting in Denial Of Service.
+datefixed: 2022-07-23
+references: regressiontests/ossfuzz47150/clusterfuzz-testcase-minimized-fuzz_init_path-6727387238236160.fuzz
+gitfixid:  24dff940cc4c71a9c3cb5475aee231b19163a12c
+tarrelease: 
+endrec: DW202207-001
+
+id: DW202206-001
+cve:
+fuzzer: 
+datereported: 2022-06-15
+reportedby: Casper Sun
+vulnerability: buffer overflow in dwarf_form.c
+product: libdwarf
+description: A carefully corrupted .debug_info section
+  would cause libdwarf to read outside of a buffer containing
+  a Dwarf_Sig8 symbolic reference.
+  That could cause a segmentation violation or other
+  major error, terminating the calling application and
+  resulting in Denial Of Service.
+  This failure to check for buffer overflow has been present
+  since DWARF4 when DW_FORM_ref_sig8 was added to libdwarf.
+datefixed: 2022-06-15
+references: regressiontests/sleicasper2/buffer-overflow-dwarf-form
+gitfixid: 7ef09e1fc9ba07653dd078edb2408631c7969162
+tarrelease: libdwarf-0.4.1.tar.xz
+endrec: DW202206-001
+
+id: DW202205-001
+cve:
+fuzzer: 
+datereported: 2022-05-26
+reportedby: Casper Sun
+vulnerability: buffer overflow in dwarf_globals.c
+product: libdwarf
+description: A carefully corrupted .debug_pubnames section
+  would cause libdwarf to read outside of a buffer containing
+  the section contents.
+  That could cause a segmentation violation or other
+  major error, terminating the calling application and
+  resulting in Denial Of Service.
+  The bug has been present for many years.
+datefixed: 2022-05-29
+references: regressiontests/sleicasper/bufferoverflow
+gitfixid: 8151575a6ace77d005ca5bb5d71c1bfdba3f7069
+tarrelease: libdwarf-0.4.1.tar.xz
+endrec: DW202205-001
+
 id: DW202111-016
 cve:
 fuzzer: oss-fuzz-41240
@@ -19,7 +108,7 @@ description: A corrupted object.
 datefixed: 2021-11-21
 references: regressiontests/ ossfuzz41240/clusterfuzz-testcase-minimized-fuzz_init_path-5929343686148096
 gitfixid: a120c808234060c3c9b1872ab9a059aa1ac70b1d 
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-016
 
 id: DW202111-015
@@ -39,7 +128,7 @@ datefixed: 2021-11-12
 references: regressiontests/ossfuzz40896/clusterfuzz-testcase-fuzz_init_path-5337872492789760
   regressiontests/ossfuzz40896/clusterfuzz-testcase-minimized-fuzz_init_path-5337872492789760
 gitfixid: b7a119dc07c502c1334bcbf8dd04ca0e4d5f6ab6
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-015
 
 id: DW202111-014
@@ -58,7 +147,7 @@ datefixed: 2021-11-12
 references: regressiontests/ossfuzz40895/clusterfuzz-testcase-fuzz_init_binary-4805508242997248
   regressiontests/ossfuzz40895/clusterfuzz-testcase-minimized-fuzz_init_binary-4805508242997248
 gitfixid: b7a119dc07c502c1334bcbf8dd04ca0e4d5f6ab6
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-014
 
 
@@ -73,7 +162,7 @@ description: dwarf_elf_load_headers.c in libdwarf before 2019-07-05 allows attac
 datefixed: 2019-07-05
 references: 
 gitfixid: cb7198abde46c2ae29957ad460da6886eaa606ba
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW201907-001
 
 id: DW202111-013
@@ -95,7 +184,7 @@ references: regressiontests/ossfuzz40802/ clusterfuzz-testcase-fuzz_init_binary-
   regressiontests/ossfuzz40802/clusterfuzz-testcase-minimized-fuzz_init_binary-5538015955517440.fuzz
 
 gitfixid: adf4dae25b39039f1821b095688c00f3010e1d37
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-013
 
 
@@ -115,7 +204,7 @@ datefixed: 2021-11-07
 references: regressiontests/ossfuzz801/clusterfuzz-testcase-fuzz_init_path-5443517279764480
   regressiontests/ossfuzz40801/clusterfuzz-testcase-minimized-fuzz_init_path-5443517279764480
 gitfixid: 94dece3ce0f030d06da442a103bd6a5301410b25
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-012
 
 
@@ -137,7 +226,7 @@ datefixed: 2021-11-07
 references: regressiontests/ossfuzz40799/clusterfuzz-testcase-fuzz_init_path-5245778948390912
   regressiontests/ossfuzz40799/clusterfuzz-testcase-minimized-fuzz_init_path-5245778948390912
 gitfixid: 94dece3ce0f030d06da442a103bd6a5301410b25
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-011
 
 
@@ -158,7 +247,7 @@ datefixed: 2021-11-07
 references: regressiontests/ossfuzz40627/clusterfuzz-testcase-fuzz_init_path-5186858573758464
   regressiontests/ossfuzz40627/clusterfuzz-testcase-minimized-fuzz_init_path-5186858573758464
 gitfixid: 94dece3ce0f030d06da442a103bd6a5301410b25
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-010
 
 id: DW202111-009
@@ -180,7 +269,7 @@ description: The object file (macho 64 bit) has some
 datefixed: 2021-11-07
 references: regressiontests/ossfuzz40729/clusterfuzz-testcase-minimized-fuzz_init_binary-4791627277795328
 gitfixid: 94dece3ce0f030d06da442a103bd6a5301410b25
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-009
 
 id: DW202111-008
@@ -198,7 +287,7 @@ description: The fuzzed macho64 object has corrupted
 datefixed: 2021-11-07
 references: regressiontests/ossfuzz40731/clusterfuzz-testcase-fuzz_init_binary-5983147574034432
 gitfixid: 94dece3ce0f030d06da442a103bd6a5301410b25
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-008
 
 
@@ -217,7 +306,7 @@ description:  Object file has corrupt section group information.
 datefixed: 2021-11-07
 references: regressiontests/ossfuzz40674/clusterfuzz-testcase-minimized-fuzz_init_path-6557751518560256
 gitfixid: 94dece3ce0f030d06da442a103bd6a5301410b25
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-005
 
 id: DW202111-004
@@ -236,7 +325,7 @@ description: The macho object has corrupted headers
 datefixed: 2021-11-05
 references: regressiontests/ossfuzz40673/clusterfuzz-testcase-minimized-fuzz_init_path-6240961391362048.fuzz 
 gitfixid: 94dece3ce0f030d06da442a103bd6a5301410b25
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-004
 
 id: DW202111-003
@@ -259,7 +348,7 @@ datefixed: 2021-11-05
 references: regressiontests/oss40671/clusterfuzz-testcase-fuzz_init_path-5455557297831936
   regressiontests/oss40671/clusterfuzz-testcase-minimized-fuzz_init_path-5455557297831936
 gitfixid: b40f7e291216e771185f62292dd6304b5a662926
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-003
 
 
@@ -283,7 +372,7 @@ datefixed: 2021-11-04
 references: regressiontests/ossfuzz40669/clusterfuzz-testcase-minimized-fuzz_init_path-5399726397194240
   regressiontests/clusterfuzz-testcase-fuzz_init_path-5399726397194240
 gitfixid: b40f7e291216e771185f62292dd6304b5a662926
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-002
 
 
@@ -309,7 +398,7 @@ description:  Corrupted MachO object can crash caller
 datefixed: 2021-11-04
 references: regressiontests/ossfuzz40663/clusterfuzz-testcase-minimized-fuzz_init_path-6122542432124928
 gitfixid: b40f7e291216e771185f62292dd6304b5a662926 
-tarrelease:
+tarrelease: libdwarf-0.4.1.tar.xz
 endrec: DW202111-001
 
 

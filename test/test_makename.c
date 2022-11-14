@@ -38,18 +38,22 @@ Portions Copyright(C) David Anderson 2016. All Rights reserved.
    any normal case.
 */
 
-#include "config.h"
-#include <stdio.h>
-#include <string.h> /* for strchr etc */
-#include <stdlib.h> /* for exit() */
+#include <config.h>
+
+#include <stdio.h>  /* printf() */
+#include <stdlib.h> /* exit() */
+
 #ifdef HAVE_STDINT_H
-#include <stdint.h>
+#include <stdint.h> /* uintptr_t */
 #endif /* HAVE_STDINT_H */
-#include "dwarf.h"
+
 #include "libdwarf.h"
 #include "dwarf_tsearch.h"
 #include "dd_makename.h"
 #include "dd_globals.h"
+#include "dd_minimal.h"
+
+void dd_minimal_count_global_error(void) {}
 
 #if defined(__WIN32) &&  (!defined(__GNUC__) && !defined(__clang__))
 #pragma warning(disable:4996)    /* Warning when migrated to VS2010 */
@@ -69,7 +73,7 @@ char *samples[]  = {
 0
 };
 
-int main(int argc, char *argv[])
+int main(void)
 {
     char *e1 = 0;
     char *e2= 0;
@@ -95,11 +99,8 @@ int main(int argc, char *argv[])
         ++errct;
     }
     if (errct) {
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     printf("PASS makename test\n");
     return 0;
-
-    (void)argc;
-    (void)argv;
 }

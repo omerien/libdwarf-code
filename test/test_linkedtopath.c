@@ -31,11 +31,11 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  */
 
 #include <config.h>
 
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "dwarf.h"
+#include <stddef.h> /* size_t */
+#include <stdio.h>  /* printf() */
+#include <stdlib.h> /* exit() free() */
+#include <string.h> /* memset() strcmp() strlen() */
+
 #include "libdwarf.h"
 #include "libdwarf_private.h"
 #include "dwarf_base_types.h"
@@ -326,7 +326,9 @@ test3(Dwarf_Debug dbg)
     char * linkstring = "de";
     dwarfstring result;
     char ** global_prefix = 0;
+#if 0
     unsigned char crc[4];
+#endif
     unsigned buildid_length = 20;
     char **paths_returned = 0;
     unsigned paths_returned_count = 0;
@@ -336,10 +338,12 @@ test3(Dwarf_Debug dbg)
     dwarfstring linkstring_fullpath;
     unsigned i = 0;
 
+#if 0
     crc[0] = 0x12;
     crc[1] = 0x34;
     crc[2] = 0x56;
     crc[3] = 0xab;
+#endif
     res = dwarf_add_debuglink_global_path(dbg,
         "/usr/lib/debug",&error);
     printf("Adding global path /usr/lib/debug\n");
@@ -347,7 +351,7 @@ test3(Dwarf_Debug dbg)
         ++errcount;
         printf("Adding debuglink global path failed line %d %s\n",
             __LINE__,__FILE__);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     res = dwarf_add_debuglink_global_path(dbg,
         "/fake/lib/debug",&error);
@@ -356,7 +360,7 @@ test3(Dwarf_Debug dbg)
         ++errcount;
         printf("Adding debuglink global path failed line %d %s\n",
             __LINE__,__FILE__);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     /*  The test will not be repeatable in general
@@ -374,7 +378,9 @@ test3(Dwarf_Debug dbg)
         executablepath,
         linkstring,
         &linkstring_fullpath,
+#if 0
         crc,
+#endif
         buildid,
         buildid_length,
         &paths_returned,&paths_returned_count,
@@ -399,7 +405,9 @@ test3(Dwarf_Debug dbg)
         dbg->de_gnu_global_path_count,
         executablepath,linkstring,
         &linkstring_fullpath,
+#if  0
         crc,
+#endif
         buildid,
         buildid_length,
         &paths_returned,&paths_returned_count,
@@ -424,7 +432,9 @@ test3(Dwarf_Debug dbg)
         dbg->de_gnu_global_path_count,
         executablepath,linkstring,
         &linkstring_fullpath,
+#if 0
         crc,
+#endif
         buildid,
         buildid_length,
         &paths_returned,&paths_returned_count,
@@ -448,7 +458,7 @@ test3(Dwarf_Debug dbg)
     dwarfstring_destructor(&linkstring_fullpath);
 }
 
-int main(int argc, char *argv[])
+int main(void)
 {
     Dwarf_Debug dbg = 0;
     struct Dwarf_Debug_s db;
@@ -464,7 +474,4 @@ int main(int argc, char *argv[])
         return 1;
     }
     return 0;
-
-    (void)argc;
-    (void)argv;
 }

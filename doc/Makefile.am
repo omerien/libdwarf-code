@@ -1,6 +1,7 @@
 ###Copyright (C) 2018 Vincent Torri <vincent dot torri at gmail dot com
 ###This code is public domain and can be freely used or copied.
 
+AUTOMAKE_OPTIONS=subdir-objects
 MAINTAINERCLEANFILES = Makefile.in
 
 ### This is meant to be run in the doc directory itself.
@@ -31,22 +32,23 @@ doxygen:
 	$(dox_verbose)$(DOXYGEN)
 
 install-data-local:
-	$(MKDIR_P) $(docdir)
-	cp -r html $(docdir)
-	cp -r latex $(docdir)
+	$(MKDIR_P) $(DESTDIR)$(docdir)
+	cp -r html $(DESTDIR)$(docdir)
+	cp -r latex $(DESTDIR)$(docdir)
 endif
 
 clean-local:
 	rm -rf html latex
 
 uninstall-local:
-	rm -rf $(docdir)/html $(docdir)/latex
+	rm -rf $(DESTDIR)$(docdir)/html $(DESTDIR)$(docdir)/latex
 
 EXTRA_DIST = \
 Doxyfile \
 mips_extensions.mm \
 mips_extensions.pdf \
 checkexamples.c \
+libdwarf.dox \
 dwarfdump.1 \
 dwarfgen.1  \
 libdwarf.pdf \

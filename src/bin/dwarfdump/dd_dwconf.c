@@ -345,14 +345,13 @@ find_a_file(const char *named_file,
                 "dwarfdump.conf",14);
             lname = szPath;
 
+            if (!lname || !strlen(lname)) {
+                lname="<Impossible file name string>";
+            }
             if (glflags.gf_show_dwarfdump_conf) {
-                if (!lname || !strlen(lname)) {
-                    lname="<Impossible name  string>";
-                }
                 printf("dwarfdump looking for"
                     " configuration as: \"%s\"\n", lname);
             }
-
             fin = fopen(lname, type);
             if (fin) {
                 *name_used = lname;
@@ -543,9 +542,19 @@ get_token(char *cp, struct token_s *outtok)
 {
     char *lcp = skipwhite(cp);
     unsigned tlen = find_token_len(lcp);
+    static int outofmem = FALSE;
 
     outtok->tk_len = tlen;
     if (tlen > 0) {
+        char *src = build_string(tlen, lcp);
+        if (!src) {
+            if (!outofmem) {
+                printf("Dwarfdump out of memory reading "
+                    "dwarfdump.conf and will likely not work.\n");
+            }
+            outofmem = TRUE;
+            return "";
+        }
         outtok->tk_data = build_string(tlen, lcp);
     } else {
         outtok->tk_data = "";
@@ -672,7 +681,7 @@ add_to_reg_table(struct dwconf_s *conf,
         if (!newregs) {
             printf("dwarfdump: unable to malloc table %lu bytes. "
                 " %s line %lu\n", newtabsize, fname, lineno);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         /* Zero out the new entries. */
         memset((char *) newregs + (oldtabsize), 0,
@@ -1293,7 +1302,7 @@ parse_abi(FILE * stream, const char *fname, const char *abiname,
             printf("dwarfdump internal error,"
                 " impossible line type %d  %s %lu \n",
                 (int) comtype, fname, lineno);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
     ++errcount;

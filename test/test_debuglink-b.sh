@@ -3,10 +3,10 @@
 # Intended to be run only on local machine.
 # Run only after config.h created in a configure
 # in the source directory
-# Assumes we run the script in the test directory.
-# srcdir is from the environment and is, here, the 
-# place of the top director itself (may be a relative
-# path).
+#
+# Assumes we run the script in the test directory of the build.
+# Either pass in the top source dir as an argument
+# or set env var DWTOPSRCDIR to the source directory.
 
 chkres() {
 r=$1
@@ -17,25 +17,29 @@ then
   exit 1
 fi
 }
+
 echo "Argument count: $#"
-if [ $# -eq 2 ]
+if [ $# -gt 0 ]
 then
-  DWTOPSRCDIR="$1"
-  blddir="$2"
-  top_blddir=$blddir
+  top_srcdir="$1"
 else
-  # DWTOPSRCDIR an env var.
-  blddir=`pwd`
-  top_blddir=`dirname $blddir`
+  if [ x$DWTOPSRCDIR = "x" ]
+  then
+    top_srcdir=$top_blddir
+    echo "top_srcdir from top_blddir $top_srcdir"
+  else
+    top_srcdir=$DWTOPSRCDIR
+    echo "top_srcdir from DWTOPSRCDIR $top_srcdir"
+  fi
 fi
-if [ x$DWTOPSRCDIR = "x" ]
+blddir=`pwd`
+bname=`basename $blddir`
+top_blddir="$blddir"
+if [ x$bname = "xtest" ]
 then
-  top_srcdir=$top_blddir
-  echo "top_srcdir from top_blddir $top_srcdir"
-else
-  top_srcdir=$DWTOPSRCDIR
-  echo "top_srcdir from DWTOPSRCDIR $top_srcdir"
+  top_blddir="$blddir/.."
 fi
+
 if [ "x$top_srcdir" = "x.." ]
 then
   # This case hopefully eliminates relative path to test dir. 
@@ -63,31 +67,18 @@ then
 fi
 }
 
-echo "debuglinktest-b.sh test2"
-o=junk.debuglink2
+echo "test_debuglink-b.sh test2"
+o=junk.dlinkb
 p=" --no-follow-debuglink --add-debuglink-path=/exam/ple"
 p2="--add-debuglink-path=/tmp/phony"
 echo "Run: $bldloc/dwdebuglink $p $p2 $testsrc/dummyexecutable "
 $bldloc/dwdebuglink $p $p2 $testsrc/dummyexecutable > $testbin/$o
 r=$?
 chkres $r "running dwdebuglink test2"
-if [ $r -ne 0 ]
-then
-  echo "Error debuglinktest-a.sh"
-  exit $r
-fi
-# we strip out the actual localsrc and blddir for the obvious
-# reason: We want the baseline data to be meaningful no matter
-# where one's source/build directories are.
-sed "s:$localsrc:..src..:" <$testbin/$o  >$testbin/${o}a
-sed "s:$blddir:..bld..:" <$testbin/${o}a  >$testbin/${o}b
-diff $testsrc/debuglink2.base  $testbin/${o}b
+${localsrc}/test_transformpath.py $localsrc $blddir $testbin/$o $testbin/${o}c
+${localsrc}/test_dwdiff.py $testsrc/debuglink2.base $testbin/${o}c
 r=$?
-chkres $r "running debuglinktest-b.sh  diff against baseline"
-if [ $r -ne 0 ]
-then
-   echo "To update debuglinktest-b.sh  baseline: mv $testbin/${o}b $testsrc/debuglink2.base"
-   exit $r
-fi
-
+echo "To update test_debuglink-b.sh  baseline:"
+echo " mv $testbin/${o}c $testsrc/debuglink2.base"
+chkres $r "running test_debuglink-b.sh  diff against baseline"
 exit 0
